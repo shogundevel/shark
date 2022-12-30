@@ -1,0 +1,575 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import system.path
+import system.string: strbuf, concat, join, format
+import system.io: open
+import system.util
+
+import sharkc.error: compiler_error
+
+class block_context
+    function init(parent)
+        self.parent = parent
+        self.namespace = { }
+
+class lua_generator
+    var compiler
+    var parent
+    var out
+    var buffer
+    var outfile
+    var indent_level
+    var local_id
+    var context
+    var class_context
+    var function_context
+    var globals
+    var assign_target
+    var exp
+    var exp_left
+    var exp_base
+    var call_stack
+    var call_args
+    var values
+    var keys
+    
+    function init()
+        self.compiler = null
+        self.parent = null
+        self.out = null
+        self.buffer = new strbuf ()
+        self.outfile = null
+        self.indent_level = 0
+        self.local_id = 0
+        self.context = null
+        self.class_context = null
+        self.function_context = null
+        self.in_constructor = false
+        self.globals = { }
+        self.assign_target = false
+        self.exp = null
+        self.exp_left = null
+        self.exp_base = null
+        self.call_stack = [ ]
+        self.call_args = null
+        self.values = null
+        self.keys = null
+    
+    function print(data)
+        for _ in range(self.indent_level) do
+            self.buffer.puts("    ")
+        self.buffer.puts(data)
+        self.buffer.puts("\n")
+    
+    function printf(data, args)
+        self.print(format(data, args))
+    
+    function indent()
+        self.indent_level += 1
+    
+    function dedent()
+        self.indent_level -= 1
+    
+    function get_local()
+        var local = format("__local_%__", [self.local_id])
+        self.local_id += 1
+        return local
+    
+    function enter()
+        self.context = new block_context(self.context)
+    
+    function exit()
+        self.context = self.context.parent
+    
+    function define(name)
+        if self.context != null then
+            var local = self.get_local()
+            self.context.namespace[name] = local
+            self.printf("local % = null;", [local])
+            return local
+        else
+            var global = format("__globals__.%", [name])
+            self.globals[name] = global
+            return global
+    
+    function define_native(name)
+        var global = format("__globals__.%", [name])
+        self.globals[name] = global
+        self.printf("% = %", [global, name])
+    
+    function start(compiler, filename, out)
+        self.compiler = compiler
+        compiler.backend = self
+        self.out = out
+        self.outfile = open(out, "w")
+        if self.outfile == null then
+            compiler_error(format("can't open file '%' for writing, compilation aborted.", [out]))
+        self.main_import_path = path::remove_ext(path::get_tail(filename))
+        self.enter_module(self.main_import_path)
+    
+    function enter_module(import_path)
+        self.printf("__shark_rt_modules['%'] = function ()", [import_path])
+        self.indent()
+        self.print("local __globals__ = { };")
+        self.printf("__shark_rt_imports['%'] = __globals__", [import_path])
+    
+    function exit_module()
+        self.print("return __globals__")
+        self.dedent()
+        self.print("end")
+        self.outfile.puts(self.buffer.read_all())
+    
+    function close()
+        self.exit_module()
+        self.outfile.close()
+    
+    function begin_source(import_path)
+        var generator = new lua_generator ()
+        generator.compiler = self.compiler
+        generator.compiler.backend = generator
+        generator.parent = self
+        generator.out = self.out
+        generator.outfile = self.outfile
+        generator.enter_module(join(".", import_path))
+    
+    function end_source()
+        self.exit_module()
+        self.compiler.backend = self.parent
+    
+    function import_decl(import_path, alias, target)
+        var name = null
+        if target == null then
+            name = alias or import_path[sizeof(import_path)-1]
+        else
+            name = self.get_local()
+        var global = self.define(name)
+        self.printf("% = __shark_rt_import('%')", [global, join(".", import_path)])
+        if target != null then
+            for target_name in target do
+                var target_global = self.define(target_name)
+                self.printf("% = %.%", [target_global, global, target_name])
+    
+    function search(name)
+        context = self.context
+        while context != null do
+            if name in context.namespace then
+                return context.namespace[name]
+            context = context.parent
+        if name in self.globals then
+            return self.globals[name]
+        else
+            return format("__globals__.%", [name])
+    
+    function name(name)
+        self.exp = self.search(name)
+    
+    function get_static(field)
+        self.exp = format("%.%", [self.exp, field])
+    
+    function clear_exp()
+        self.exp = null
+    
+    function enter_class(name)
+        self.class_context = self.define(name)
+        self.parent_class = "__shark_object__"
+        if self.exp != null then
+            self.parent_class = self.exp
+        self.printf("% = __shark_rt_create_class(%, %)", [self.class_context, name, self.parent_class])
+    
+    function exit_class(empty)
+        self.class_context = null
+    
+    function var_decl(name)
+        if self.class_context != null and self.function_context == null then
+            return
+        if self.exp == null then
+            if self.function_context == null then
+                self.define_native(name)
+        else
+            self.printf("% = %;", [self.define(name), self.exp])
+    
+    function enter_function(name, args, has_body)
+        var full_args = join(", ", args)
+        if self.class_context != null then
+            if sizeof(args) != 0 then
+                full_args = join(", ", ["self", full_args])
+            else
+                full_args = "self"
+        if name == "init" and self.class_context != null then
+            self.in_constructor = true
+        if self.class_context != null then
+            self.printf("%.% = function (%)", [self.class_context, name, full_args])
+        else
+            var global_name = self.define(name)
+            self.printf("% = function (%)", [global_name, full_args])
+        self.indent()
+        if has_body then
+            self.local_id = 0
+            self.function_context = name
+            self.enter()
+            for arg in args do
+                self.context.namespace[arg] = arg
+        else
+            self.printf("error('function ' .. '%' .. ' is not implemented')", [name])
+            self.print("end")
+            self.dedent()
+    
+    function exit_function()
+        self.exit()
+        self.function_context = null
+        if self.in_constructor then
+            self.print("return self")
+        self.in_constructor = false
+        self.dedent()
+        self.print("end")
+    
+    function enter_block()
+        self.enter()
+        self.indent()
+    
+    function exit_block()
+        self.exit()
+        self.dedent()
+    
+    function pass_decl()
+        pass
+    
+    function if_stat()
+        self.printf("if % then", [self.exp])
+    
+    function enter_else_if()
+        pass
+    
+    function else_if()
+        self.printf("elseif % then", [self.exp])
+    
+    function else_clause()
+        self.print("else")
+    
+    function close_if()
+        self.print("end")
+    
+    function close_else_if()
+        pass
+    
+    function enter_while()
+        pass
+    
+    function while_stat()
+        self.print("repeat")
+        self.indent()
+        self.print("local continue = false")
+        self.printf("while % do", [self.exp])
+        self.indent()
+        self.print("continue = false")
+        self.dedent()
+    
+    function exit_while()
+        self.print("end")
+        self.print("if not continue then break")
+        self.print("else continue = false end")
+        self.dedent()
+        self.print("until false")
+    
+    function push()
+        self.exp_base = self.exp_left
+        self.exp_left = self.exp
+    
+    function for_range(name)
+        self.enter()
+        self.print("repeat")
+        self.indent()
+        self.print("local continue = false")
+        self.print("local __START = 0")
+        self.printf("local __END = % - 1", [self.exp])
+        var local = self.define(name)
+        self.printf("for % = __START, __END do", [local])
+        self.indent()
+        self.printf("__START = %", [local])
+        self.dedent()
+    
+    function for_range_start(name)
+        self.enter()
+        self.print("repeat")
+        self.indent()
+        self.print("local continue = false")
+        self.printf("local __START = %", [self.exp_left])
+        self.printf("local __END = % - 1", [self.exp])
+        var local = self.define(name)
+        self.printf("for % = __START, __END do", [local])
+        self.indent()
+        self.printf("__START = %", [local])
+        self.dedent()
+    
+    function for_each(name)
+        self.enter()
+        self.print("repeat")
+        self.indent()
+        self.print("local continue = false")
+        self.print("local __START = 0")
+        self.printf("local __DATA = %", [self.exp])
+        self.print("local __END = sizeof(__DATA) - 1")
+        var local = self.define(name)
+        self.print("for __INDEX = __START, __END do")
+        self.indent()
+        self.print("__START = __INDEX")
+        self.printf("local % = __DATA[__INDEX]", [local])
+        self.dedent()
+    
+    function end_for()
+        self.exit()
+        self.print("end")
+        self.print("if not continue then break")
+        self.print("else continue = false end")
+        self.dedent()
+        self.print("until false")
+    
+    function break_stat()
+        self.print("break")
+    
+    function continue_stat()
+        self.print("continue = true")
+        self.print("break")
+    
+    function return_stat()
+        if self.exp == null then
+            if self.in_constructor then
+                self.print("return self")
+            else
+                self.print("return null")
+        else
+            self.printf("return %", [self.exp])
+    
+    function append()
+        self.exit_assign()
+        self.printf("__shark_rt_append(%, %)", [self.exp_left, self.exp])
+    
+    function enter_assign()
+        self.push()
+        self.call_stack << [self.exp_left, self.exp_base]
+    
+    function exit_assign()
+        var data = util::pop(self.call_stack)
+        self.exp_left = data[0]
+        self.exp_base = data[1]
+    
+    function get_assign_op(op)
+        if op == "*=" then
+            return "*"
+        else if op == "/=" then
+            return "/"
+        else if op == "%=" then
+            return "%"
+        else if op == "+=" then
+            return "+"
+        else if op == "-=" then
+            return "-"
+        else
+            return "="
+    
+    function exp_stat()
+        self.print(self.exp)
+    
+    function enter_binop(op)
+        self.call_stack << self.exp_left
+        self.push()
+    
+    function exit_binop()
+        self.exp_left = util::pop(self.call_stack)
+    
+    function binary_op(op)
+        if op == "in" then
+            self.exp = format("%[%] ~= nil", [self.exp, self.exp_left])
+            self.exit_binop()
+            return
+        else if op == "not" then
+            self.exp = format("%[%] == nil", [self.exp, self.exp_left])
+            self.exit_binop()
+            return
+        else if op == "!=" then
+            op = "~="
+        self.exp = format("% % %", [self.exp_left, op, self.exp])
+        self.exit_binop()
+    
+    function unary_op(op)
+        self.exp = format("% %", [op, self.exp])
+    
+    function enter_call()
+        self.call_stack << [self.exp_left, self.call_args]
+        self.push()
+        self.call_args = [ ]
+    
+    function exit_call()
+        var frame = util::pop(self.call_stack)
+        self.exp_left = frame[0]
+        self.call_args = frame[1]
+    
+    function push_arg()
+        self.call_args << self.exp
+    
+    function function_call()
+        self.exp = format("%(%)", [self.exp_left, join(", ", self.call_args)])
+        self.exit_call()
+    
+    function enter_index()
+        self.call_stack << self.exp_left
+        self.push()
+    
+    function exit_index()
+        self.exp_left = util::pop(self.call_stack)
+    
+    function get_index()
+        self.exp = format("%[%]", [self.exp_left, self.exp])
+        self.exit_index()
+    
+    function insert()
+        self.exit_assign()
+        self.printf("__shark_rt_insert(%, %, %)", [self.exp_base, self.exp_left, self.exp])
+        self.exit_index()
+    
+    function set_index(op)
+        self.exit_assign()
+        if op != "=" then
+            self.printf("%[%] = %[%] % %", [self.exp_base, self.exp_left, self.exp_base, self.exp_left, self.get_assign_op(op), self.exp])
+        else
+            self.printf("%[%] % %", [self.exp_base, self.exp_left, op, self.exp])
+        self.exit_index()
+    
+    function get_field(field)
+        self.exp = format("%.%", [self.exp, field])
+    
+    function method_call(name)
+        self.exp = format("%:%(%)", [self.exp_left, name, join(", ", self.call_args)])
+        self.exit_call()
+    
+    function set_field(field, op)
+        self.exit_assign()
+        if op != "=" then
+            self.printf("%.% = %.% % %", [self.exp_left, field, self.exp_left, field, self.get_assign_op(op), self.exp])
+        else
+            self.printf("%.% % %", [self.exp_left, field, op, self.exp])
+    
+    function set_static(field, op)
+        self.set_field(field, op)
+    
+    function set_name(name, op)
+        self.exit_assign()
+        if op != "=" then
+            self.printf("% = % % %", [self.search(name), self.search(name), self.get_assign_op(op), self.exp])
+        else
+            self.printf("% % %", [self.search(name), op, self.exp])
+    
+    function enter_super_call()
+        pass
+    
+    function self_exp()
+        self.exp = "self"
+    
+    function super_call()
+        var args = ""
+        if sizeof(self.call_args) != 0 then
+            args = concat(", ", join(", ", self.call_args))
+        self.exp = format("%.super.%(self%)", [self.class_context, self.function_context, args])
+        self.exit_call()
+    
+    function sizeof_op()
+        self.exp = format("sizeof(%)", [self.exp])
+    
+    function new_op()
+        var args = join(", ", self.call_args)
+        self.exp = format("(__shark_object_new(%):init(%))", [self.exp_left, args])
+        self.exit_call()
+    
+    function instanceof_op()
+        self.exp = format("__shark_object_instanceof(%, %)", [self.exp_left, self.exp])
+    
+    function enter_data_exp()
+        self.call_stack << [self.keys, self.values]
+    
+    function exit_data_exp()
+        var frame = util::pop(self.call_stack)
+        self.keys = frame[0]
+        self.values = frame[1]
+    
+    function enter_array_exp()
+        self.enter_data_exp()
+        self.values = [ ]
+    
+    function push_array_value()
+        self.values << self.exp
+    
+    function array_exp()
+        self.exp = format("__shark_rt_list({%}, %)", [join(", ", self.values), sizeof(self.values)])
+        self.exit_data_exp()
+    
+    function enter_table_exp()
+        self.enter_data_exp()
+        self.keys = [ ]
+        self.values = [ ]
+    
+    function push_table_key()
+        self.keys << self.exp
+    
+    function push_table_value()
+        self.values << self.exp
+    
+    function push_table_null_value()
+        self.values << "true"
+    
+    function push_table_item()
+        pass
+    
+    function table_exp()
+        var items = [ ]
+        for index in range(sizeof(self.keys)) do
+            items << format("[%] = %", [self.keys[index], self.values[index]])
+        self.exp = format("{%}", [join(", ", items)])
+        self.exit_data_exp()
+    
+    function nested_exp()
+        self.exp = format("(%)", [self.exp])
+    
+    function null_exp()
+        self.exp = "nil"
+    
+    function true_exp()
+        self.exp = "true"
+    
+    function false_exp()
+        self.exp = "false"
+    
+    function int_literal(value)
+        self.exp = value
+    
+    function float_literal(value)
+        self.exp = value
+    
+    function char_literal(value)
+        self.exp = value
+    
+    function string_literal(value)
+        self.exp = value

@@ -1,0 +1,176 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+var ERR_INVALID_LITERAL = 2
+var CHAR_SIZE = 1
+
+var tostring
+var tonumber
+var string
+var gmatch = string.gmatch
+var byte = string.byte
+
+function itos(x)
+    return tostring(x)
+
+function ftos(x)
+    return tostring(x)
+
+function ctos(x)
+    return x
+
+function stoi(x)
+    return tonumber(x)
+
+function stof(x)
+    return tonumber(x)
+
+function islower(x)
+    return gmatch(x, "%l")() != null
+
+function isupper(x)
+    return gmatch(x, "%u")() != null
+
+function isalpha(x)
+    return gmatch(x, "%a")() != null
+
+function isdigit(x)
+    return gmatch(x, "%d")() != null
+
+function isalnum(x)
+    return gmatch(x, "%w")() != null
+
+function isident(x)
+    return gmatch(x, "[%l%u_]")() != null
+
+function ishex(x)
+    return gmatch(x, "%x")() != null
+
+function isascii(x)
+    return byte(x, 1) < 128
+
+function issurrogate(x)
+    return false
+
+function tolower(x)
+function toupper(x)
+
+var len = string.len
+var sub = string.sub
+
+function index(data, index)
+    return sub(data, index, index)
+
+function slice(data, start, _end)
+    return sub(data, start, _end - 1)
+
+var find = string.find
+var table
+var cat = table.concat
+
+function concat(x, y)
+    return cat({1: x, 2: y})
+
+var rawget
+
+function join(sep, list)
+    return cat(rawget(list, "data"), sep)
+
+function split(data, sep)
+    var start = 0
+    var split = [ ]
+    for i in range(len(data)) do
+        if index(data, i) == sep then
+            split << sub(data, start, i - 1)
+            start = i + 1
+    split << sub(data, start, len(data))
+    return split
+
+function format(data, args)
+    var start = 0
+    var format = { }
+    var current = 0
+    for i in range(len(data) + 1) do
+        if index(data, i) == '%' then
+            format[current * 2 + 1] = sub(data, start, i - 1)
+            format[current * 2 + 2] = tostring(args[current])
+            start = i + 1
+            current += 1
+    format[current * 2 + 1] = sub(data, start, len(data))
+    return cat(format)
+
+var gsub = string.gsub
+
+var normal_data = {
+    '0': '\0',
+    'r': '\r',
+    'n': '\n',
+    't': '\t',
+    '\\': '\\',
+    '"': '"',
+    '\'': '\''
+}
+
+function normal(data)
+    return gsub(sub(data, 1, len(data) - 1), "([\\].)", normal_data)
+
+function quote(data)
+
+class strbuf
+    function init()
+        self.buffer = { }
+    
+    function put(value)
+        self.buffer[sizeof(self.buffer) + 1] = value
+    
+    function puts(data)
+        self.buffer[sizeof(self.buffer) + 1] = data
+    
+    function printf(data, args)
+        self.buffer[sizeof(self.buffer) + 1] = format(data, args)
+    
+    function read_all()
+        var read = cat(self.buffer)
+        self.buffer = { }
+        return read
+
+class bytes
+    function init()
+    
+    function put(value)
+    function put_short(value)
+    function put_int(value)
+    function puts(data)
+    
+    function tell()
+    function patch(pos, value)
+    function patch_short(pos, value)
+    function patch_int(pos, value)
+    
+    function get(index)
+
+function encode(data)
+function decode(data)

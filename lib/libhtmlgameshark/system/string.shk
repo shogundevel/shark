@@ -1,0 +1,132 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+var ERR_INVALID_LITERAL = 2
+var CHAR_SIZE = 2
+
+var String
+var Number
+
+function itos(x)
+    return "" + x
+
+function ftos(x)
+    return "" + x
+
+function ctos(x)
+    return String.fromCharCode(x)
+
+function stoi(x)
+    return Number(x)
+
+function stof(x)
+    return Number(x)
+
+function islower(x)
+    return x >= 'a' and x <= 'z'
+
+function isupper(x)
+    return x >= 'A' and x <= 'Z'
+
+function isalpha(x)
+    return islower(x) or isupper(x)
+
+function isdigit(x)
+    return x >= '0' and x <= '9'
+
+function isalnum(x)
+    return isalpha(x) or isdigit(x)
+
+function isident(x)
+    return isalnum(x) or x == '_'
+
+function ishex(x)
+    return isdigit(x) or (x >= 'a' and x <= 'f') or (x >= 'A' and x <= 'F')
+
+function isascii(x)
+    return x <= 127
+
+function issurrogate(x)
+    return false
+
+function tolower(x)
+    if isupper(x) then
+        return x + ('a' - 'A')
+    else
+        return x
+
+function toupper(x)
+    if islower(x) then
+        return x + ('A' - 'a')
+    else
+        return x
+
+function len(data)
+    return data.length
+
+function index(data, index)
+    return data.charCodeAt(index)
+
+function slice(data, start, end)
+    return data.substring(start, end)
+
+function find(x, y)
+    return x.indexOf(y)
+
+function concat(x, y)
+    return x + y
+
+function join(sep, list)
+    return list.join(sep)
+
+function split(data, sep)
+    return data.split(sep)
+
+function format(data, args)
+    var data_list = data.split("%")
+    var result = ""
+    for index in range(sizeof(args)) do
+        result += data_list[index]
+        result += args[index]
+    result += data_list[sizeof(data_list) - 1]
+
+class strbuf
+    function init()
+        self.buffer = ""
+    
+    function put(value)
+        self.buffer += String.fromCharCode(value)
+    
+    function puts(data)
+        self.buffer += data
+    
+    function printf(data, args)
+        self.buffer += format(data, args)
+    
+    function read_all()
+        var read = self.buffer
+        self.buffer = ""
+        return read

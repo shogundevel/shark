@@ -1,0 +1,622 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import system.path
+import system.string
+import system.string: format
+import system.io: open, printf
+
+import sharkc.lexer: lexer
+import sharkc.error: compiler_error
+
+var op_priority = {
+    "or": 1,
+    "and": 2,
+    "==": 3,
+    "!=": 3,
+    "not": 3,
+    "in": 3,
+    "<": 4,
+    "<=": 4,
+    ">": 4,
+    ">=": 4,
+    "+": 5,
+    "-": 5,
+    "*": 6,
+    "/": 6,
+    "%": 6
+}
+
+var unary_operators = {"not", "-"}
+
+class compiler
+    var backend
+    var include
+    var record
+    
+    var filename
+    var lex
+    var token
+    var lineno
+    
+    var in_type
+    var in_function
+    var in_loop
+    var assign_target
+    var assign_op
+    var else_if
+    
+    function init()
+        self.backend = null
+        self.include = null
+        self.record = { }
+        self.filename = null
+        self.lex = null
+        self.token = null
+        self.lineno = 0
+        self.in_type = false
+        self.in_function = false
+        self.in_loop = false
+        self.assign_target = false
+        self.assign_op = null
+        self.else_if = false
+    
+    function compile(main, backend, out)
+        self.backend = backend
+        self.include = path::get_base(main)
+        self.backend.start(self, main, out)
+        var source = open(main, "r")
+        if source == null then
+            compiler_error(format("can't open file '%' for reading, compilation aborted.", [main]))
+        self.source_file(main, source)
+        self.backend.close()
+    
+    function error(message)
+        compiler_error(format("file '%', line % in token (%, %): %", [self.filename, self.lineno, self.token.type, self.token.value, message]))
+    
+    function next()
+        var value = self.token.value
+        self.token = self.lex.scan()
+        self.lineno = self.lex.lineno
+        return value
+    
+    function match(value)
+        if self.token.value == value then
+            self.next()
+            return true
+        else
+            return false
+    
+    function consume(type)
+        if self.token.type != type then
+            self.error(format("invalid token type, expected '%' but got '%'.", [type, self.token.type]))
+        return self.next()
+    
+    function expect(value)
+        if not self.match(value) then
+            self.error(format("invalid token, expected '%' but got '%'.", [value, self.token.value]))
+    
+    function eol()
+        if self.match(";") then
+            self.seol()
+        else if self.token.type == "newline" then
+            self.next()
+        else
+            self.error(format("expected EOL but got '%' token.", [self.token.type]))
+    
+    function seol()
+        if self.token.type == "newline" then
+            self.next()
+    
+    function match_indent()
+        if self.token.type == "indent" then
+            self.next()
+            return true
+        else
+            return false
+    
+    function match_dedent()
+        if self.token.type == "dedent" then
+            self.next()
+            return true
+        else
+            return false
+    
+    function indent()
+        if not self.match_indent() then
+            self.error("expected an indented block.")
+    
+    function dedent(lineno)
+        if not self.match_dedent() then
+            self.error(format("expected the end of the block (started at line %).", [lineno]))
+    
+    function source_file(filename, source)
+        var prev_filename = self.filename
+        var prev_lex = self.lex
+        var prev_token = self.token
+        var prev_lineno = self.lineno
+        
+        self.filename = filename
+        self.record[filename] = true
+        self.lex = new lexer(filename, source)
+        self.token = self.lex.scan()
+        self.lineno = self.token.lineno
+        
+        while self.match("import") do
+            self.import_decl()
+        
+        while self.token.type != "EOF" do
+            if not self.decl() then
+                self.error("expected global declaration or statement.")
+        
+        source.close()
+        
+        self.filename = prev_filename
+        self.lex = prev_lex
+        self.token = prev_token
+        self.lineno = prev_lineno
+        
+        return true
+    
+    function import_decl()
+        var import_path = self.import_path()
+        var filename = path::join(self.include, string::concat(string::join("/", import_path), ".shk"))
+        if filename not in self.record then
+            var source = open(filename, "r")
+            if source != null then
+                self.backend.begin_source(import_path)
+                self.source_file(filename, source)
+                self.backend.end_source()
+        var alias = null
+        var target = null
+        if self.match("->") then
+            alias = self.consume("name")
+        else if self.match(":") then
+            target = [ self.consume("name") ]
+            while self.match(",") do
+                target << self.consume("name")
+        self.eol()
+        self.backend.import_decl(import_path, alias, target)
+    
+    function import_path()
+        var import_path = [ self.consume("name") ]
+        while self.match(".") do
+            import_path << self.consume("name")
+        return import_path
+    
+    function decl()
+        return self.class_decl() or self.var_decl() or self.function_decl() or self.statement()
+    
+    function type()
+        if not self.path() then
+            self.error("expected a custom type.")
+    
+    function path()
+        if self.token.type == "name" then
+            self.backend.name(self.next())
+            while self.match("::") do
+                self.backend.get_static(self.consume("name"))
+            return true
+        return false
+    
+    function class_decl()
+        if self.match("class") then
+            var lineno = self.lineno
+            var name = self.consume("name")
+            if self.match("(") then
+                self.type()
+                self.expect(")")
+            else
+                self.backend.clear_exp()
+            self.eol()
+            self.backend.enter_class(name)
+            self.indent()
+            if self.pass_decl() then
+                self.dedent(lineno)
+                self.backend.exit_class(true)
+            else
+                self.in_type = true
+                while not self.match_dedent() do
+                    if not (self.var_decl() or self.function_decl()) then
+                        self.error("expected a declaration in class body.")
+                self.in_type = false
+                self.backend.exit_class(false)
+            return true
+        return false
+    
+    function pass_decl()
+        if self.match("pass") then
+            self.eol()
+            return true
+        return false
+    
+    function var_decl()
+        if self.match("var") then
+            var name = self.consume("name")
+            if self.match("=") then
+                if self.in_type and not self.in_function then
+                    self.error("field declaration can't have an initializer.")
+                self.exp()
+            else
+                self.backend.clear_exp()
+            self.backend.var_decl(name)
+            self.eol()
+            return true
+        return false
+    
+    function function_decl()
+        if self.match("function") then
+            var name = self.consume("name")
+            var args = self.args()
+            self.eol()
+            if self.token.type == "indent" then
+                self.backend.enter_function(name, args, true)
+                self.in_function = true
+                self.indented_block()
+                self.in_function = false
+                self.backend.exit_function()
+            else
+                self.backend.enter_function(name, args, false)
+            return true
+        return false
+    
+    function args()
+        self.expect("(")
+        var args = [ ]
+        if not self.match(")") then
+            args << self.consume("name")
+            while self.match(",") do
+                args << self.consume("name")
+            self.expect(")")
+        return args
+    
+    function block()
+        self.backend.enter_block()
+        if not self.simple_statement() then
+            self.indented_block()
+        self.backend.exit_block()
+    
+    function indented_block()
+        var lineno = self.lineno
+        self.seol()
+        self.indent()
+        if self.pass_decl() then
+            self.backend.pass_decl()
+            self.dedent(lineno)
+        else
+            while not self.match_dedent() do
+                if not (self.var_decl() or self.statement()) then
+                    self.error("expected declaration or statement.")
+    
+    function statement()
+        var lineno = self.lineno
+        if self.match("if") then
+            if self.else_if then
+                self.backend.enter_else_if()
+            self.exp()
+            self.expect("then")
+            var else_if = false
+            if self.else_if then
+                else_if = true
+                self.backend.else_if()
+                self.else_if = false
+            else
+                self.backend.if_stat()
+            self.block()
+            if self.match("else") then
+                if self.token.value == "if" then
+                    self.else_if = true
+                    self.statement()
+                else
+                    self.backend.else_clause()
+                    self.block()
+            if else_if then
+                self.backend.close_else_if()
+            else
+                self.backend.close_if()
+        else if self.match("while") then
+            self.backend.enter_while()
+            self.exp()
+            self.expect("do")
+            self.backend.while_stat()
+            var prev_in_loop = self.in_loop
+            self.in_loop = true
+            self.block()
+            self.in_loop = prev_in_loop
+            self.backend.exit_while()
+        else if self.match("for") then
+            var name = self.consume("name")
+            self.expect("in")
+            if self.match("range") then
+                self.expect("(")
+                self.exp()
+                if self.match(",") then
+                    self.backend.push()
+                    self.exp()
+                    self.backend.for_range_start(name)
+                else
+                    self.backend.for_range(name)
+                self.expect(")")
+            else
+                self.exp()
+                self.backend.for_each(name)
+            self.expect("do")
+            var prev_in_loop = self.in_loop
+            self.in_loop = true
+            self.block()
+            self.in_loop = prev_in_loop
+            self.backend.end_for()
+        else
+            return self.simple_statement()
+        return true
+    
+    function simple_statement()
+        if self.match("break") then
+            if not self.in_loop then
+                self.error("break statement outside loop.")
+            self.eol()
+            self.backend.break_stat()
+        else if self.match("continue") then
+            if not self.in_loop then
+                self.error("continue statement outside loop.")
+            self.eol()
+            self.backend.continue_stat()
+        else if self.match("delete") then
+            self.exp()
+            self.eol()
+            self.backend.delete_stat()
+        else if self.match("return") then
+            if not self.in_function then
+                self.error("return statement outside function.")
+            self.optional_exp()
+            self.eol()
+            self.backend.return_stat()
+        else
+            return self.assign_stat()
+        return true
+    
+    function assign_stat()
+        var assign = self.assign()
+        if assign then self.eol()
+        return assign
+    
+    function assign()
+        self.assign_target = true
+        var exp = self.binary_op(0)
+        if exp and self.assign_target then
+            if self.match_insert() then
+                self.backend.append()
+            else
+                self.backend.exp_stat()
+        self.assign_target = false
+        return exp
+    
+    function match_assign()
+        if self.assign_target and self.token.type == "assign" then
+            self.assign_target = false
+            self.assign_op = self.next()
+            self.backend.enter_assign()
+            self.exp()
+            return true
+        else
+            return false
+    
+    function match_insert()
+        if self.assign_target and self.match("<<") then
+            self.assign_target = false
+            self.backend.enter_assign()
+            self.exp()
+            return true
+        else
+            return false
+    
+    function binary_op(priority)
+        var exp = self.unary_op()
+        while exp do
+            var op = self.token.value
+            if op in op_priority and op_priority[op] > priority then
+                self.next()
+                self.backend.enter_binop(op)
+                if op == "not" then
+                    self.expect("in")
+                if not self.binary_op(op_priority[op]) then
+                    self.error(format("expected expression after '%'.", [op]))
+                self.backend.binary_op(op)
+            else
+                break
+        return exp
+    
+    function unary_op()
+        var op = self.token.value
+        if op in unary_operators then
+            self.next()
+            if not self.post_op() then
+                self.error(format("expected expression after unary '%'.", [op]))
+            self.backend.unary_op(op)
+            return true
+        else
+            return self.post_op()
+    
+    function post_op()
+        var exp = self.primary_exp()
+        while exp do
+            if self.match("(") then
+                self.function_call()
+                self.backend.function_call()
+            else if self.match("[") then
+                self.backend.enter_index()
+                self.exp()
+                self.expect("]")
+                if self.match_assign() then
+                    self.backend.set_index(self.assign_op)
+                else if self.match_insert() then
+                    self.backend.insert()
+                else
+                    self.backend.get_index()
+            else if self.match(".") then
+                var field = self.consume("name")
+                if self.match_assign() then
+                    self.backend.set_field(field, self.assign_op)
+                else if self.match("(") then
+                    self.function_call()
+                    self.backend.method_call(field)
+                else
+                    self.backend.get_field(field)
+            else
+                break
+        return exp
+    
+    function function_call()
+        self.backend.enter_call()
+        if not self.match(")") then
+            self.exp()
+            self.backend.push_arg()
+            while self.match(",") do
+                self.exp()
+                self.backend.push_arg()
+            self.expect(")")
+    
+    function primary_exp()
+        if self.literal() then
+            return true
+        else if self.token.type == "name" then
+            var name = self.next()
+            if self.token.value == "::" then
+                self.backend.name(name)
+                while self.match("::") do
+                    var field = self.consume("name")
+                    if self.match_assign() then
+                        self.backend.set_static(field, self.assign_op)
+                    else
+                        self.backend.get_static(field)
+            else if self.match_assign() then
+                self.backend.set_name(name, self.assign_op)
+            else
+                self.backend.name(name)
+        else if self.match("self") then
+            if not self.in_type then
+                self.error("self expression outside class.")
+            self.backend.self_exp()
+        else if self.match("super") then
+            if not self.in_type then
+                self.error("self expression outside class.")
+            self.backend.enter_super_call()
+            self.expect("(")
+            self.function_call()
+            self.backend.super_call()
+        else if self.match("sizeof") then
+            self.expect("(")
+            self.exp()
+            self.expect(")")
+            self.backend.sizeof_op()
+        else if self.match("new") then
+            self.type()
+            self.expect("(")
+            self.function_call()
+            self.backend.new_op()
+        else if self.match("instanceof") then
+            self.expect("(")
+            self.exp()
+            self.expect(",")
+            self.backend.push()
+            self.type()
+            self.expect(")")
+            self.backend.instanceof_op()
+        else if self.match("[") then
+            self.backend.enter_array_exp()
+            if not self.match("]") then
+                self.exp()
+                self.backend.push_array_value()
+                while self.match(",") do
+                    self.exp()
+                    self.backend.push_array_value()
+                self.expect("]")
+            self.backend.array_exp()
+        else if self.match("{") then
+            self.backend.enter_table_exp()
+            if not self.match("}") then
+                self.exp()
+                self.backend.push_table_key()
+                if self.match(":") then
+                    self.exp()
+                    self.backend.push_table_value()
+                else
+                    self.backend.push_table_null_value()
+                self.backend.push_table_item()
+                while self.match(",") do
+                    self.exp()
+                    self.backend.push_table_key()
+                    if self.match(":") then
+                        self.exp()
+                        self.backend.push_table_value()
+                    else
+                        self.backend.push_table_null_value()
+                    self.backend.push_table_item()
+                self.expect("}")
+            self.backend.table_exp()
+        else if self.match("(") then
+            self.exp()
+            self.expect(")")
+            self.backend.nested_exp()
+        else
+            return false
+        return true
+    
+    function literal()
+        if self.match("null") then
+            self.backend.null_exp()
+        else if self.match("true") then
+            self.backend.true_exp()
+        else if self.match("false") then
+            self.backend.false_exp()
+        else if self.token.type == "int" then
+            self.backend.int_literal(self.next())
+        else if self.token.type == "float" then
+            self.backend.float_literal(self.next())
+        else if self.token.type == "char" then
+            self.backend.char_literal(self.next())
+        else if self.token.type == "string" then
+            self.backend.string_literal(self.next())
+        else
+            return false
+        return true
+    
+    function optional_exp()
+        if self.binary_op(0) then
+            return true
+        else
+            self.backend.clear_exp()
+            return false
+    
+    function exp()
+        if not self.binary_op(0) then
+            self.error("expected expression.")
+        return true
+
+var __compiler = new compiler ()
+
+function compile(filename, backend, out)
+    __compiler.compile(filename, backend, out)

@@ -1,0 +1,59 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+var math
+
+var pi = math.pi
+var e = 2.718281
+
+var abs = math.abs
+
+var acos = math.acos
+var asin = math.asin
+var atan = math.atan
+var atan2 = math.atan2
+
+var cos = math.cos
+var cosh = math.cosh
+var sin = math.sin
+var sinh = math.sinh
+var tan = math.tan
+var tanh = math.tanh
+
+var exp = math.exp
+var log = math.log
+var log10 = math.log10
+var pow = math.pow
+var sqrt = math.sqrt
+
+var ceil = math.ceil
+var floor = math.floor
+
+var min = math.min
+var max = math.max
+
+function random(x)
+    return math.random(x) - 1

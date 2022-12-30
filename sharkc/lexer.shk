@@ -1,0 +1,366 @@
+################################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import system.util
+import system.string
+
+import system.io: printf
+
+import sharkc.error: compiler_error
+
+class token
+    var lineno
+    var type
+    var value
+    
+    function init(lineno, type, value)
+        self.lineno = lineno
+        self.type = type
+        self.value = value
+
+var keywords = {"import", "class", "pass", "var", "function",
+    "if", "then", "else", "while", "do", "for", "in", "range",
+    "break", "continue", "return", "not", "and", "or",
+    "self", "super", "new", "instanceof", "sizeof",
+    "null", "true", "false"}
+
+var escape_char = {
+    '0': '\0',
+    'r': '\r',
+    'n': '\n',
+    't': '\t',
+    '\\': '\\',
+    '"': '"',
+    '\'': '\''
+}
+
+class lexer
+    var filename
+    var source
+    var lineno
+    var current_char
+    var token
+    var token_start
+    var indent_token
+    var dedent_token
+    var indent_stack
+    var indent_level
+    var dedent_count
+    var post_indent
+    var delimiter_count
+    var empty_line
+    
+    function init(filename, source)
+        self.filename = filename
+        self.source = source
+        self.lineno = 1
+        self.current_char = source.fetch()
+        if self.current_char == ' ' then
+            self.error("unexpected indent at the beggining of input.")
+        self.token = new token(0, null, null)
+        self.indent_token = new token(0, "indent", "indent")
+        self.dedent_token = new token(0, "dedent", "dedent")
+        self.indent_stack = [ 0 ]
+        self.indent_level = 0
+        self.dedent_count = 0
+        self.post_indent = false
+        self.delimiter_count = 0
+        self.empty_line = true
+        self.buffer = new string::strbuf ()
+    
+    function error(message)
+        compiler_error(string::format("file '%' line %: %", [self.filename, self.lineno, message]))
+    
+    function emit(type, value)
+        self.token.lineno = self.lineno
+        self.token.type = type
+        self.token.value = value
+        if self.empty_line then
+            self.empty_line = false
+            if self.delimiter_count == 0 then
+                var indent = self.indent()
+                if indent != null then
+                    return indent
+        return self.token
+    
+    function indent()
+        var indent_level = self.indent_stack[sizeof(self.indent_stack) - 1]
+        if self.indent_level > indent_level then
+            self.indent_stack << self.indent_level
+            return self.emit_indent()
+        else if self.indent_level == indent_level then
+            return null
+        else
+            while self.indent_level < indent_level do
+                self.dedent_count += 1
+                util::pop(self.indent_stack)
+                indent_level = self.indent_stack[sizeof(self.indent_stack) - 1]
+            if self.indent_level != indent_level then
+                self.error("inconsistent indentation")
+            return self.emit_dedent()
+    
+    function emit_indent()
+        self.post_indent = true
+        self.indent_token.lineno = self.lineno
+        return self.indent_token
+    
+    function emit_dedent()
+        self.post_indent = true
+        self.dedent_count -= 1
+        self.dedent_token.lineno = self.lineno
+        return self.dedent_token
+    
+    function next()
+        var value = self.current_char
+        if self.source.at_end() then
+            self.current_char = '\0'
+        else
+            self.current_char = self.source.fetch()
+            if self.current_char == '\0' then
+                self.error("unexpected null character.")
+        return value
+    
+    function match(value)
+        if self.current_char == value then
+            self.next()
+            return true
+        else
+            return false
+    
+    function skip_until(char)
+        while self.current_char != char do
+            if self.current_char == '\n' then
+                self.lineno += 1
+            else if self.current_char == '\0' then
+                return
+            self.next()
+    
+    function escape()
+        var c = self.next()
+        if c in escape_char then
+            return c
+        else
+            self.error("invalid escape sequence.")
+    
+    function scan_name()
+        while string::isident(self.current_char) do
+            self.buffer.put(self.next())
+        var value = self.buffer.read_all()
+        if value in keywords then
+            return self.emit("keyword", value)
+        else
+            return self.emit("name", value)
+    
+    function scan_number(start)
+        self.buffer.put(start)
+        if start == '0' then
+            if self.current_char == 'x' or self.current_char == 'X' then
+                self.buffer.put(self.next())
+                if not string::ishex(self.current_char) then
+                    self.error("expected at least one hex digit in hex literal.")
+                self.buffer.put(self.next())
+                while string::ishex(self.current_char) do
+                    self.buffer.put(self.next())
+                return self.emit("int", self.buffer.read_all())
+            else if string::isdigit(self.current_char) then
+                self.error("unexpected digit character after zero.")
+        while string::isdigit(self.current_char) do
+            self.buffer.put(self.next())
+        if self.match('.') then
+            self.buffer.put('.')
+            if not string::isdigit(self.current_char) then
+                self.error("expected at leas one digit after dot.")
+            self.buffer.put(self.next())
+            while string::isdigit(self.current_char) do
+                self.buffer.put(self.next())
+            if self.current_char == 'e' or self.current_char == 'E' then
+                self.buffer.put(self.next())
+                if self.current_char == '-' then
+                    self.buffer.put(self.next())
+                if not string::isdigit(self.current_char) then
+                    self.error("expected at least one digit in exponent specifier.")
+                self.buffer.put(self.next())
+                while string::isdigit(self.current_char) do
+                    self.buffer.put(self.next())
+            return self.emit("float", self.buffer.read_all())
+        return self.emit("int", self.buffer.read_all())
+    
+    function scan()
+        if self.dedent_count > 0 then
+            return self.emit_dedent()
+        else if self.post_indent then
+            self.post_indent = false
+            return self.token
+        while true do
+            var c = self.next()
+            if c == ' ' or c == '\t' or c == '\r' then
+                continue
+            else if c == '\n' then
+                self.indent_level = 0
+                while self.match(' ') do
+                    self.indent_level += 1
+                var newline = null
+                if not self.empty_line and self.delimiter_count == 0 then
+                    newline = self.emit("newline", "newline")
+                self.lineno += 1
+                self.empty_line = true
+                if newline != null then
+                    return newline
+                else
+                    continue
+            else if c == '\0' then
+                self.indent_level = 0
+                var indent = self.indent()
+                self.emit("EOF", "EOF")
+                if indent != null then
+                    return indent
+                return self.token
+            else if c == ':' then
+                if self.match(':') then
+                    return self.emit("delimiter", "::")
+                else
+                    return self.emit("delimiter", ":")
+            else if c == ';' then
+                return self.emit("delimiter", ";")
+            else if c == '.' then
+                return self.emit("delimiter", ".")
+            else if c == ',' then
+                return self.emit("delimiter", ",")
+            else if c == '[' then
+                self.delimiter_count += 1
+                return self.emit("delimiter", "[")
+            else if c == ']' then
+                self.delimiter_count -= 1
+                return self.emit("delimiter", "]")
+            else if c == '{' then
+                self.delimiter_count += 1
+                return self.emit("delimiter", "{")
+            else if c == '}' then
+                self.delimiter_count -= 1
+                return self.emit("delimiter", "}")
+            else if c == '(' then
+                self.delimiter_count += 1
+                return self.emit("delimiter", "(")
+            else if c == ')' then
+                self.delimiter_count -= 1
+                return self.emit("delimiter", ")")
+            else if c == '*' then
+                if self.match('=') then
+                    return self.emit("assign", "*=")
+                else
+                    return self.emit("operator", "*")
+            else if c == '/' then
+                if self.match('=') then
+                    return self.emit("assign", "/=")
+                else
+                    return self.emit("operator", "/")
+            else if c == '%' then
+                if self.match('=') then
+                    return self.emit("assign", "%=")
+                else
+                    return self.emit("operator", "%")
+            else if c == '+' then
+                if self.match('+') then
+                    return self.emit("inc", "++")
+                else if self.match('=') then
+                    return self.emit("assign", "+=")
+                else
+                    return self.emit("operator", "+")
+            else if c == '-' then
+                if self.match('>') then
+                    return self.emit("delimiter", "->")
+                else if self.match('-') then
+                    return self.emit("inc", "--")
+                else if self.match('=') then
+                    return self.emit("assign", "-=")
+                else
+                    return self.emit("operator", "-")
+            else if c == '<' then
+                if self.match('=') then
+                    return self.emit("operator", "<=")
+                else if self.match('<') then
+                    if self.match('=') then
+                        return self.emit("assign", "<<=")
+                    else
+                        return self.emit("operator", "<<")
+                else
+                    return self.emit("operator", "<")
+            else if c == '>' then
+                if self.match('=') then
+                    return self.emit("operator", ">=")
+                else if self.match('>') then
+                    return self.emit("operator", ">>")
+                else
+                    return self.emit("operator", ">")
+            else if c == '=' then
+                if self.match('=') then
+                    return self.emit("operator", "==")
+                else
+                    return self.emit("assign", "=")
+            else if c == '!' then
+                if self.match('=') then
+                    return self.emit("operator", "!=")
+                else
+                    return self.emit("operator", "!")
+            else if c == '"' then
+                self.buffer.put('"')
+                while not self.match('"') do
+                    var c = self.next()
+                    self.buffer.put(c)
+                    if c == '\\' then
+                        self.buffer.put(self.escape())
+                    else if c == '\n' then
+                        self.error("unexpected EOL while scanning string literal.")
+                self.buffer.put('"')
+                return self.emit("string", self.buffer.read_all())
+            else if c == '\'' then
+                self.buffer.put('\'')
+                if self.match('\\') then
+                    self.buffer.put('\\')
+                    self.buffer.put(self.escape())
+                else if self.match('\'') then
+                    self.error("expected at least one character in char literal (try escaping the quote with \\).")
+                else if self.match('\n') then
+                    self.error("unexpected EOL while scanning character literal.")
+                else
+                    self.buffer.put(self.next())
+                while not self.match('\'') do
+                    if self.match('\0') then
+                        self.error("expected a quote to close character literal.")
+                    self.buffer.put(self.next())
+                self.buffer.put('\'')
+                return self.emit("char", self.buffer.read_all())
+            else if c == '#' then
+                self.skip_until('\n')
+            else
+                if string::isalpha(c) or c == '_' then
+                    self.buffer.put(c)
+                    return self.scan_name()
+                else if string::isdigit(c) then
+                    return self.scan_number(c)
+                else
+                    printf("c = %\n", [c]);
+                    self.error("invalid character.")

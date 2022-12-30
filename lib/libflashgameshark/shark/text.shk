@@ -1,0 +1,53 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import shark.texture: texture
+
+var current_object
+var depth = current_object.getNextHighestDepth()
+var TextFormat
+var BitmapData
+
+class font
+    function init(size, color)
+        self.format = new TextFormat ()
+        self.format.size = size
+        self.format.color = color
+    
+    function get_height()
+        return self.format.size
+    
+    function get_width(data)
+        return 320
+    
+    function render(text)
+        var text_container = current_object.createEmptyMovieClip("text_container", depth)
+        text_container._x = 1024
+        var text_data = text_container.createTextField("text_data", 1, 0, 0, self.format.size + 2, 320)
+        text_data.text = text
+        var bitmap_data = new BitmapData (320, self.format.size + 2, true, 0x00)
+        bitmap_data.draw(text_container)
+        return new texture (bitmap_data)

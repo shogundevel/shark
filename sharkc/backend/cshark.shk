@@ -1,0 +1,620 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import system.path
+import system.string: concat, format, join, stoi, slice, encode, normal, bytes
+import system.io: open, printf
+import system.util
+
+import sharkc.backend.cshark.OP
+import sharkc.backend.cshark.CONST
+import sharkc.error: compiler_error
+
+var binary_operators = {"==": OP::EQ,
+                        "!=": OP::NE,
+                        "not": OP::NOT_IN,
+                        "in": OP::IN,
+                        "<": OP::LT,
+                        "<=": OP::LE,
+                        ">": OP::GT,
+                        ">=": OP::GE,
+                        "+": OP::ADD,
+                        "-": OP::SUB,
+                        "*": OP::MUL,
+                        "/": OP::DIV,
+                        "%": OP::MOD}
+
+var short_circuit_operator = {"and": OP::AND, "or": OP::OR}
+
+var assign_operators = {"+=": OP::ADD,
+                        "-=": OP::SUB,
+                        "*=": OP::MUL,
+                        "/=": OP::DIV,
+                        "%=": OP::MOD}
+
+class block_context
+    function init(parent)
+        self.parent = parent
+        self.namespace = { }
+
+class import_decl
+    function init(import_path, alias, target)
+        self.import_path = import_path
+        self.alias = alias
+        self.target = target
+
+class bytecode_generator
+    function init()
+        self.compiler = null
+        self.parent = null
+        self.out = null
+        self.buffer = null
+        self.local_id = 0
+        self.context = null
+        self.class_context = null
+        self.function_context = null
+        self.call_args = null
+    
+    function put_str(str)
+        var data = encode(str)
+        self.block.put_int(data.tell())
+        self.block.puts(data)
+    
+    function get_local()
+        var local = self.local_id
+        self.local_id += 1
+        return local
+    
+    function enter()
+        self.context = new block_context(self.context)
+    
+    function exit()
+        self.block.put(OP::EXIT)
+        self.block.put_short(sizeof(self.context.namespace))
+        self.local_id -= sizeof(self.context.namespace)
+        self.context = self.context.parent
+    
+    function define(name)
+        if self.context != null then
+            var local = self.get_local()
+            self.context.namespace[name] = local
+            return local
+        else
+            self.block.put(OP::DEFINE)
+            self.block.put_int(self.const(CONST::SYMBOL, name))
+            return name
+    
+    function start(compiler, filename, out)
+        self.compiler = compiler
+        compiler.backend = self
+        self.out = out
+        self.import_path = path::remove_ext(path::get_tail(filename))
+        self.buffer = open(out, "wb")
+        if self.buffer == null then
+            compiler_error(format("can't open file '%' for writing, compilation aborted.", [out]))
+        self.enter_source()
+    
+    function close()
+        self.exit_source()
+        self.buffer.close()
+    
+    function enter_source()
+        self.imports = [ ]
+        self.const_block = new bytes ()
+        self.const_id = 0
+        self.const_table = { }
+        self.const_table[CONST::INT] = { }
+        self.const_table[CONST::FLOAT] = { }
+        self.const_table[CONST::CHAR] = { }
+        self.const_table[CONST::STR] = { }
+        self.const_table[CONST::SYMBOL] = { }
+        self.init_block = new bytes ()
+        self.block = self.init_block
+        self.label_stack = [ ]
+        self.else_label = null
+        self.end_label = null
+        self.loop_context = null
+        self.break_label = null
+        self.break_patch = null
+        self.continue_label = null
+        self.exit_label = null
+        self.short_circuit = null
+    
+    function exit_source()
+        self.block.put(OP::END)
+        self.main_block = new bytes ()
+        self.block = self.main_block
+        self.put_str(self.import_path)
+        self.block.put_short(sizeof(self.imports))
+        for import_decl in self.imports do
+            self.put_str(join(".", import_decl.import_path))
+            if import_decl.target == null then
+                self.block.put(0)
+                self.put_str(import_decl.alias or import_decl.import_path[sizeof(import_decl.import_path)-1])
+            else
+                self.block.put(1)
+                self.block.put_short(sizeof(import_decl.target))
+                for target in import_decl.target do
+                    self.put_str(target)
+        var const_table_size = 0
+        const_table_size += sizeof(self.const_table[CONST::INT])
+        const_table_size += sizeof(self.const_table[CONST::FLOAT])
+        const_table_size += sizeof(self.const_table[CONST::CHAR])
+        const_table_size += sizeof(self.const_table[CONST::STR])
+        const_table_size += sizeof(self.const_table[CONST::SYMBOL])
+        self.main_block.put_int(const_table_size)
+        self.main_block.puts(self.const_block)
+        self.main_block.put_int(self.init_block.tell())
+        self.main_block.puts(self.init_block)
+        self.buffer.puts(self.main_block)
+    
+    function begin_source(import_path)
+        var generator = new bytecode_generator ()
+        generator.compiler = self.compiler
+        generator.compiler.backend = generator
+        generator.parent = self
+        generator.out = self.out
+        generator.buffer = self.buffer
+        generator.import_path = join(".", import_path)
+        generator.enter_source()
+    
+    function end_source()
+        self.exit_source()
+        self.compiler.backend = self.parent
+    
+    function import_decl(import_path, alias, target)
+        self.imports << new import_decl(import_path, alias, target)
+    
+    function search(name)
+        context = self.context
+        while context != null do
+            if name in context.namespace then
+                return context.namespace[name]
+            context = context.parent
+        return null
+    
+    function name(name)
+        var local = self.search(name)
+        if local == null then
+            self.block.put(OP::LOAD_GLOBAL)
+            self.block.put_int(self.const(CONST::SYMBOL, name))
+        else
+            self.block.put(OP::LOAD)
+            self.block.put_short(local)
+    
+    function get_static(field)
+        self.block.put(OP::GET_STATIC)
+        self.block.put_int(self.const(CONST::SYMBOL, field))
+    
+    function const(type, value)
+        if value in self.const_table[type] then
+            return self.const_table[type][value]
+        else
+            var const_id = self.const_id
+            self.const_id += 1
+            self.const_table[type][value] = const_id
+            var prev_block = self.block
+            self.block = self.const_block
+            self.block.put(type)
+            if type == CONST::INT then
+                self.block.put_int(stoi(value))
+            else
+                self.put_str(value)
+            self.block = prev_block
+            return const_id
+    
+    function clear_exp()
+        self.block.put(OP::NULL)
+    
+    function enter_class(name)
+        self.class_context = name
+        self.block.put(OP::ENTER_CLASS)
+        self.block.put_int(self.const(CONST::SYMBOL, name))
+    
+    function exit_class(empty)
+        self.class_context = null
+        self.block.put(OP::EXIT_CLASS)
+    
+    function var_decl(name)
+        if self.class_context != null and self.function_context == null then
+            self.block.put(OP::DROP)
+        else
+            self.define(name)
+    
+    function enter_function(name, args, has_body)
+        self.block.put(OP::FUNCTION)
+        self.block.put_short(sizeof(args))
+        self.block.put_int(self.const(CONST::SYMBOL, name))
+        if has_body then
+            self.local_id = 0
+            self.function_context = name
+            self.enter()
+            if self.class_context != null then
+                self.define("self")
+            for arg in args do
+                self.define(arg)
+            self.block = new bytes ()
+        else
+            self.block.put_int(2)
+            self.block.put(OP::NOT_IMPLEMENTED)
+            self.block.put(OP::END)
+    
+    function exit_function()
+        self.exit()
+        self.block.put(OP::END)
+        self.init_block.put_int(self.block.tell())
+        self.init_block.puts(self.block)
+        self.block = self.init_block
+        self.function_context = null
+    
+    function enter_block()
+        self.enter()
+    
+    function exit_block()
+        self.exit()
+    
+    function pass_decl()
+        pass
+    
+    function if_stat()
+        self.begin_if()
+    
+    function begin_if()
+        self.block.put(OP::IF)
+        self.label_stack << self.else_label
+        self.label_stack << self.end_label
+        self.else_label = self.block.tell()
+        self.end_label = null
+        self.block.put_short(0)
+    
+    function enter_else_if()
+        self.begin_else()
+    
+    function else_if()
+        self.begin_if()
+    
+    function else_clause()
+        self.begin_else()
+    
+    function begin_else()
+        self.block.put(OP::JUMP)
+        self.end_label = self.block.tell()
+        self.block.put_short(0)
+        self.block.patch_short(self.else_label, self.block.tell() - self.else_label)
+    
+    function close_if()
+        if self.end_label == null then
+            self.block.patch_short(self.else_label, self.block.tell() - self.else_label)
+        else
+            self.block.patch_short(self.end_label, self.block.tell() - self.end_label)
+        self.end_label = util::pop(self.label_stack)
+        self.else_label = util::pop(self.label_stack)
+    
+    function close_else_if()
+        self.close_if()
+    
+    function enter_while()
+        self.enter_loop()
+    
+    function while_stat()
+        self.loop_cond()
+    
+    function exit_while()
+        self.exit_loop()
+    
+    function enter_loop()
+        self.label_stack << self.loop_context
+        self.label_stack << self.break_label
+        self.label_stack << self.break_patch
+        self.label_stack << self.continue_label
+        self.loop_context = self.context
+        self.block.put(OP::JUMP)
+        var skip_label = self.block.tell()
+        self.block.put_short(0)
+        self.break_label = self.block.tell()
+        self.block.put(OP::JUMP)
+        self.break_patch = self.block.tell()
+        self.block.put_short(0)
+        self.block.patch_short(skip_label, self.block.tell() - skip_label)
+        self.continue_label = self.block.tell()
+        return skip_label
+    
+    function loop_cond()
+        self.block.put(OP::IF)
+        self.label_stack << self.exit_label
+        self.exit_label = self.block.tell()
+        self.block.put_short(0)
+    
+    function exit_loop()
+        self.block.put(OP::LOOP)
+        self.block.put_short(self.block.tell() - self.continue_label)
+        self.block.patch_short(self.break_patch, self.block.tell() - self.break_patch)
+        self.block.patch_short(self.exit_label, self.block.tell() - self.exit_label)
+        self.exit_label = util::pop(self.label_stack)
+        self.continue_label = util::pop(self.label_stack)
+        self.break_patch = util::pop(self.label_stack)
+        self.break_label = util::pop(self.label_stack)
+        self.loop_context = util::pop(self.label_stack)
+    
+    function push()
+        pass
+    
+    function for_cond(start, _end)
+        self.block.put(OP::INC)
+        self.block.put_short(start)
+        self.block.patch_short(self.skip_label, self.block.tell() - self.skip_label)
+        self.block.put(OP::LOAD)
+        self.block.put_short(start)
+        self.block.put(OP::LOAD)
+        self.block.put_short(_end)
+        self.block.put(OP::LT)
+        self.loop_cond()
+    
+    function for_range(name)
+        self.enter()
+        var _end = self.define(0)
+        self.block.put(OP::ZERO)
+        self.loop_value = self.define(name)
+        self.skip_label = self.enter_loop()
+        self.for_cond(self.loop_value, _end)
+    
+    function for_range_start(name)
+        self.enter()
+        self.loop_value = self.define(name)
+        var _end = self.define(0)
+        self.skip_label = self.enter_loop()
+        self.for_cond(self.loop_value, _end)
+    
+    function for_each(name)
+        self.enter()
+        var iter = self.define(0)
+        self.block.put(OP::DUP)
+        self.block.put(OP::SIZEOF)
+        var _end = self.define(1)
+        self.block.put(OP::ZERO)
+        var start = self.define(2)
+        self.block.put(OP::NULL)
+        self.loop_value = self.define(name)
+        self.skip_label = self.enter_loop()
+        self.for_cond(start, _end)
+        self.block.put(OP::LOAD)
+        self.block.put_short(iter)
+        self.block.put(OP::LOAD)
+        self.block.put_short(start)
+        self.block.put(OP::GET_INDEX)
+        self.block.put(OP::STORE)
+        self.block.put_short(self.loop_value)
+    
+    function end_for()
+        self.exit_loop()
+        self.exit()
+    
+    function loop_exit(target)
+        var context = self.context
+        var block_size = 0
+        while context != self.loop_context do
+            block_size += sizeof(context.namespace)
+            context = context.parent
+        self.block.put(OP::EXIT)
+        self.block.put_short(block_size)
+        self.block.put(OP::LOOP)
+        self.block.put_short(self.block.tell() - target)
+    
+    function break_stat()
+        self.loop_exit(self.break_label)
+    
+    function continue_stat()
+        self.loop_exit(self.continue_label)
+    
+    function delete_stat()
+        self.block.put(OP::DROP)
+    
+    function return_stat()
+        self.block.put(OP::RETURN)
+    
+    function append()
+        self.block.put(OP::APPEND)
+    
+    function enter_assign()
+        pass
+    
+    function exp_stat()
+        self.block.put(OP::DROP)
+    
+    function enter_binop(op)
+        self.label_stack << self.short_circuit
+        if op in short_circuit_operator then
+            self.block.put(short_circuit_operator[op])
+            self.short_circuit = self.block.tell()
+            self.block.put_short(0)
+        else
+            self.short_circuit = null
+    
+    function binary_op(op)
+        if op in short_circuit_operator then
+            self.block.patch_short(self.short_circuit, self.block.tell() - self.short_circuit)
+        else
+            self.block.put(binary_operators[op])
+        self.short_circuit = util::pop(self.label_stack)
+    
+    function unary_op(op)
+        if op == "not" then
+            self.block.put(OP::NOT)
+        else
+            self.block.put(OP::NEG)
+    
+    function enter_call()
+        self.label_stack << self.call_args
+        self.call_args = 0
+    
+    function exit_call()
+        self.call_args = util::pop(self.label_stack)
+    
+    function push_arg()
+        self.call_args += 1
+    
+    function function_call()
+        self.block.put(OP::FUNCTION_CALL)
+        self.block.put(self.call_args)
+        self.exit_call()
+    
+    function enter_index()
+        pass
+    
+    function get_index()
+        self.block.put(OP::GET_INDEX)
+    
+    function insert()
+        self.block.put(OP::INSERT)
+    
+    function set_index(op)
+        if op == "=" then
+            self.block.put(OP::SET_INDEX)
+        else
+            self.block.put(OP::SET_INDEX_AU)
+            self.block.put(assign_operators[op])
+    
+    function get_field(field)
+        self.block.put(OP::GET_FIELD)
+        self.block.put_int(self.const(CONST::SYMBOL, field))
+    
+    function method_call(name)
+        self.block.put(OP::METHOD_CALL)
+        self.block.put(self.call_args)
+        self.block.put_int(self.const(CONST::SYMBOL, name))
+        self.exit_call()
+    
+    function set_field(field, op)
+        if op == "=" then
+            self.block.put(OP::SET_FIELD)
+        else
+            self.block.put(OP::SET_FIELD_AU)
+            self.block.put(assign_operators[op])
+        self.block.put_int(self.const(CONST::SYMBOL, field))
+    
+    function set_static(field, op)
+        if op == "=" then
+            self.block.put(OP::SET_STATIC)
+        else
+            self.block.put(OP::SET_STATIC_AU)
+            self.block.put(assign_operators[op])
+        self.block.put_int(self.const(CONST::SYMBOL, field))
+    
+    function set_name(name, op)
+        var target = self.search(name)
+        if target == null then
+            if op != "=" then
+                self.block.put(OP::LOAD_GLOBAL)
+                self.block.put_int(self.const(CONST::SYMBOL, target))
+                self.block.put(OP::SWAP)
+                self.block.put(assign_operators[op])
+            self.block.put(OP::STORE_GLOBAL)
+            self.block.put_int(self.const(CONST::SYMBOL, name))
+        else
+            if op != "=" then
+                self.block.put(OP::LOAD)
+                self.block.put_short(target)
+                self.block.put(OP::SWAP)
+                self.block.put(assign_operators[op])
+            self.block.put(OP::STORE)
+            self.block.put_short(target)
+    
+    function enter_super_call()
+        self.block.put(OP::SELF)
+    
+    function self_exp()
+        self.block.put(OP::SELF)
+    
+    function super_call()
+        self.block.put(OP::SUPER_CALL)
+        self.block.put(self.call_args)
+        self.exit_call()
+    
+    function sizeof_op()
+        self.block.put(OP::SIZEOF)
+    
+    function new_op()
+        self.block.put(OP::NEW)
+        self.block.put(self.call_args)
+        self.exit_call()
+    
+    function instanceof_op()
+        self.block.put(OP::INSTANCEOF)
+    
+    function enter_array_exp()
+        self.block.put(OP::ARRAY_NEW)
+    
+    function push_array_value()
+        self.block.put(OP::ARRAY_NEW_APPEND)
+    
+    function array_exp()
+        self.block.put(OP::ARRAY_CLOSE)
+    
+    function enter_table_exp()
+        self.block.put(OP::TABLE_NEW)
+    
+    function push_table_key()
+        pass
+    
+    function push_table_value()
+        pass
+    
+    function push_table_null_value()
+        self.block.put(OP::NULL)
+    
+    function push_table_item()
+        self.block.put(OP::TABLE_NEW_INSERT)
+    
+    function table_exp()
+        self.block.put(OP::TABLE_CLOSE)
+    
+    function nested_exp()
+        pass
+    
+    function null_exp()
+        self.block.put(OP::NULL)
+    
+    function true_exp()
+        self.block.put(OP::TRUE)
+    
+    function false_exp()
+        self.block.put(OP::FALSE)
+    
+    function int_literal(value)
+        self.block.put(OP::CONST)
+        self.block.put_int(self.const(CONST::INT, value))
+    
+    function float_literal(value)
+        self.block.put(OP::CONST)
+        self.block.put_int(self.const(CONST::FLOAT, value))
+    
+    function char_literal(value)
+        self.block.put(OP::CONST)
+        self.block.put_int(self.const(CONST::CHAR, normal(value)))
+    
+    function string_literal(value)
+        self.block.put(OP::CONST)
+        self.block.put_int(self.const(CONST::STR, normal(value)))

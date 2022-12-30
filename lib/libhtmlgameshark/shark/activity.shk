@@ -1,0 +1,147 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import shark.asset
+import shark.event
+
+var main = null
+var document
+var Math
+var pending_draw_op = [ ]
+var pressed = false
+
+function on_mouse_down(ev)
+    pressed = true
+    main.event(event::E_PRESS, ev.screenX / 3, ev.screenY / 3)
+
+function on_mouse_up(ev)
+    pressed = false
+    main.event(event::E_RELEASE, ev.screenX / 3, ev.screenY / 3)
+
+function on_mouse_move(ev)
+    if pressed then
+        main.event(event::E_MOVE, ev.screenX / 3, ev.screenY / 3)
+
+var console
+
+function on_key_down(ev)
+    if ev.code == "ArrowUp" then
+        main.event(event::E_PRESS_UP, 0, 0)
+    else if ev.code == "ArrowDown" then
+        main.event(event::E_PRESS_DOWN, 0, 0)
+    else if ev.code == "ArrowLeft" then
+        main.event(event::E_PRESS_LEFT, 0, 0)
+    else if ev.code == "ArrowRight" then
+        main.event(event::E_PRESS_RIGHT, 0, 0)
+    else if ev.code == "KeyZ" then
+        main.event(event::E_PRESS_X, 0, 0)
+    else if ev.code == "KeyX" then
+        main.event(event::E_PRESS_Y, 0, 0)
+
+function on_key_up(ev)
+    if ev.code == "ArrowUp" then
+        main.event(event::E_REL_UP, 0, 0)
+    else if ev.code == "ArrowDown" then
+        main.event(event::E_REL_DOWN, 0, 0)
+    else if ev.code == "ArrowLeft" then
+        main.event(event::E_REL_LEFT, 0, 0)
+    else if ev.code == "ArrowRight" then
+        main.event(event::E_REL_RIGHT, 0, 0)
+    else if ev.code == "KeyZ" then
+        main.event(event::E_REL_X, 0, 0)
+    else if ev.code == "KeyX" then
+        main.event(event::E_REL_Y, 0, 0)
+
+var window
+
+class activity
+    function init()
+        var element = document.getElementById("screen")
+        self.context = element.getContext("2d")
+        self.context.scale(3, 3)
+        window.addEventListener("mousedown", on_mouse_down, false)
+        window.addEventListener("mouseup", on_mouse_up, false)
+        window.addEventListener("mousemove", on_mouse_move, false)
+        window.addEventListener("keyup", on_key_up, false)
+        window.addEventListener("keydown", on_key_down, false)
+    
+    function draw(text, x, y)
+        if asset::__pending_images == 0 then
+            self.__do_draw(text, x, y)
+        else
+            pending_draw_op << [text, x, y]
+    
+    function draw_ex(text, x, y, origin_x, origin_y, rotation, scale_x, scale_y)
+        if asset::__pending_images == 0 then
+            self.__do_draw_ex(text, x, y, origin_x, origin_y, rotation, scale_x, scale_y)
+        else
+            pending_draw_op << [text, x, y, origin_x, origin_y, rotation, scale_x, scale_y]
+    
+    function draw_text(text, font, x, y)
+        if asset::__pending_images == 0 then
+            self.__do_draw_text(text, font, x, y)
+        else
+            pending_draw_op << [text, font, x, y]
+    
+    function __do_draw(text, x, y)
+        self.context.drawImage(text.image_data, x, u)
+    
+    function __do_draw_ex(text, x, y, origin_x, origin_y, rotation, scale_x, scale_y)
+        self.context.save()
+        self.context.translate(x, y)
+        self.context.translate(origin_x, origin_y)
+        self.context.rotate(-rotation * Math.PI / 180)
+        self.context.scale(scale_x, scale_y)
+        self.context.drawImage(text.image_data, -text.image_data.width / 2, -text.image_data.height / 2)
+        self.context.restore()
+    
+    function __do_draw_text(text, font, x, y)
+        self.context.font = font.size + "px verdana, sans-serif"
+        self.context.fillText(text, x, y)
+    
+    function __render()
+        if asset::__pending_images != 0 then
+            pending_draw_op = [ ]
+        else
+            for draw_op in pending_draw_op do
+                if sizeof(draw_op) == 3 then
+                    self.__do_draw(draw_op[0], draw_op[1], draw_op[2])
+                else if sizeof(draw_op) == 4 then
+                    self.__do_draw_text(draw_op[0], draw_op[1], draw_op[2], draw_op[3])
+                else
+                    self.__do_draw_ex(draw_op[0], draw_op[1], draw_op[2], draw_op[3], draw_op[4], draw_op[5], draw_op[6], draw_op[7])
+    
+    function launch()
+        pass
+    
+    function event(type, x, y)
+        pass
+    
+    function update()
+        pass
+    
+    function render()
+        pass

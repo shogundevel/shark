@@ -1,0 +1,125 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import system.error: set_err, ERR_UNKNOWN
+import system.string: format, bytes
+
+var ERR_FILE_NOT_FOUND = 3
+
+function feof(file)
+    var dir = file.stream.tell()
+    var end = false
+    if not file.stream.read(1) then
+        end = true
+    file.stream.seek(dir)
+    return end
+
+class text_file
+    function __init__(stream)
+        self.stream = stream
+    
+    function put(value)
+        self.stream.write(value)
+    
+    function puts(data)
+        self.stream.write(data)
+    
+    function printf(data, args)
+        self.stream.write(format(data, args))
+    
+    function fetch()
+        var c = self.stream.read(1)
+        if c == "" then
+            return '\0'
+        else
+            return c
+    
+    function read(count)
+        return self.stream.read(count)
+    
+    function at_end()
+        return feof(self)
+    
+    function close()
+        self.stream.close()
+
+var bytearray
+
+class binary_file
+    function __init__(stream)
+        self.stream = stream
+    
+    function put(value)
+        self.stream.write(new bytearray([value]))
+    
+    function puts(data)
+        self.stream.write(data.buffer)
+    
+    function fetch()
+        var data = self.stream.read(1)
+        if sizeof(data) == 0 then
+            return 0
+        else
+            return data[0]
+    
+    function read(count)
+        var read = new bytes ()
+        read.buffer = new bytearray (self.stream.read(count))
+        return read
+    
+    function at_end()
+        return feof(self)
+    
+    function close()
+        self.stream.close()
+
+var fopen
+
+function open(filename, mode)
+    var buffer = fopen(filename, mode)
+    if buffer == null then
+        set_err(ERR_UNKNOWN)
+        return null
+    else if 'b' in mode then
+        return new binary_file (buffer)
+    else
+        return new text_file (buffer)
+
+var cprint
+
+function put(value)
+    cprint(value)
+
+function puts(data)
+    cprint(data)
+
+function printf(data, args)
+    cprint(format(data, args))
+
+var input
+
+function read_line()
+    return input()

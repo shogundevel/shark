@@ -1,0 +1,145 @@
+################################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import system.io: open, puts, printf
+import system.exit: exit, FAILURE
+import system.util: slice
+import system.path: get_base, join
+import system.string: encode
+
+function fopen(name, mode)
+    var source = open(name, mode)
+    if source == null then
+        if mode == "r" or mode == "rb" then
+            printf("can't open input file '%' for reading.", [name])
+        else
+            printf("can't open output file '%' for writing.", [name])
+        exit(FAILURE)
+    return source
+
+function fread(source, target)
+    while not source.at_end() do
+        target.puts(source.read(256))
+    source.close()
+
+function main(args)
+    if sizeof(args) < 5 then
+        printf("usage % <target> <source> <main> <out> <args>\n", [args[0]])
+        puts("\tLinks the listed <args> against <source> and outputs an executable program.")
+        puts("\t<target> may be any of <c | co | py | pyo | js | as | lua | luao>, behavior depends on the selected target:\n")
+        puts("\t\tc: generates a cshark bytecode archive file with import declarations for each library listed in <args>. <args> should contain only library names, not direct filenames. The output executable depends on the listed libraries to run.\n")
+        puts("\t\tco: generates a self-contained cshark bytecode executable archive by embedding each file listed in <args>. <args> should contain file paths to the required libraries. The output executable is dependency free.\n")
+        puts("\t\tpy: generates a python file with import statements for the shark runtime (sharkrt.py) and each library listed in <args>. <args> should contain only library names, not direct filenames. The output executable depends on sharkrt.py and the listed libraries to run.\n")
+        puts("\t\tpyo: generates a self-contained python executable by embedding the shark runtime (sharkrt.py) and each file listed in <args>. <args> should contain file paths to the required libraries. The output executable is dependency free.\n")
+        puts("\t\tjs: generates a self-contained javascript executable by embedding the shark runtime (sharkrt.js) and each file listed in <args>. <args> should contain file paths to the required libraries. The output executable is dependency free.\n")
+        puts("\t\tas: generates an actionscript executable by embedding the shark runtime (sharkrt.as) and each file listed in <args>. <args> should contain file paths to the required libraries. The output requires more steps to become executable, listed in the 'guide' file that should come with this program.\n")
+        puts("\t\tlua: generates a lua file with require calls for the shark runtime (sharkrt.lua) and each library listed in <args>. <args> should contain only library names, not direct filenames. The output executable depends on sharkrt.lua and the listed libraries to run.\n")
+        puts("\t\tluao: generates a self-contained lua executable by embedding the shark runtime (sharkrt.lua) and each file listed in <args>. <args> should contain file paths to the required libraries. The output executable is dependency free.\n")
+        puts("\t<source> must point to the code file that must be linked.\n")
+        puts("\t<main> is the module name that will be the starting point of the executing program or 'lib' to create a library (unsupported in 'c' and 'co' mode).\n")
+        puts("\t<out> must point to the output file path, in which the generated code will be stored.\n")
+        return
+    var base = get_base(args[0])
+    var target = args[1]
+    var source = null
+    if target == "c" or target == "co" then
+        source = fopen(args[2], "rb")
+    else
+        source = fopen(args[2], "r")
+    var main = args[3]
+    var out = null
+    if target == "c" or target == "co" then
+        out = fopen(args[4], "wb")
+    else
+        out = fopen(args[4], "w")
+    var link = slice(args, 5, sizeof(args))
+    if target == "c" then
+        var data = encode(main)
+        out.put(data.tell())
+        out.puts(data)
+        out.put(sizeof(link))
+        for lib in link do
+            data = encode(lib)
+            out.put(data.tell())
+            out.puts(data)
+        fread(source, out)
+    else if target == "co" then
+        var data = encode(main)
+        out.put(data.tell())
+        out.puts(data)
+        out.put(0)
+        for lib in link do
+            fread(fopen(lib, "rb"), out)
+        fread(source, out)
+    else if target == "py" then
+        out.puts("from sharkrt import *\n")
+        for lib in link do
+            out.printf("import %\n", [lib])
+        fread(source, out)
+    else if target == "pyo" then
+        fread(fopen(join(base, "rt/sharkrt.py"), "r"), out)
+        for lib in link do
+            fread(fopen(lib, "r"), out)
+        fread(source, out)
+    else if target == "js" then
+        fread(fopen(join(base, "rt/sharkrt.js"), "r"), out)
+        for lib in link do
+            fread(fopen(lib, "r"), out)
+        fread(source, out)
+    else if target == "as" then
+        fread(fopen(join(base, "rt/sharkrt.as"), "r"), out)
+        for lib in link do
+            fread(fopen(lib, "r"), out)
+        fread(source, out)
+        out.puts("var main = __shark_rt_import('main');\n")
+        out.puts("current_child = new main.main_activity ();\n")
+        out.puts("current_child.launch()")
+    else if target == "lua" then
+        out.puts("require('sharkrt')\n")
+        for lib in link do
+            out.printf("require('%')\n", [lib])
+        fread(source, out)
+    else if target == "luao" then
+        fread(fopen(join(base, "rt/sharkrt.lua"), "r"), out)
+        for lib in link do
+            fread(fopen(lib, "r"), out)
+        fread(source, out)
+    else
+        printf("can't recognize the desired target '%' (must be one of <c | co | py | pyo | js | as | lua | luao>).", [target])
+    if main != "lib" then
+        if target == "py" or target == "pyo" then
+            out.puts("import sys\n")
+            out.printf("main_module = shark_import_module('%')\n", [main])
+            out.puts("try: main = main_module.main\n")
+            out.puts("except: main = None\n")
+            out.puts("if main: main(sys.argv)")
+        else if target == "js" then
+            out.printf("var main = __shark_rt_import('%');\n", [main])
+        else if target == "lua" or target == "luao" then
+            out.printf("main = __shark_rt_import('%')\n", [main])
+            out.puts("arg[#arg + 1] = ''\n")
+            out.puts("if main.main then main.main(arg) end")
+    out.close()

@@ -1,0 +1,97 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+var END = 0
+var NULL = 1
+var TRUE = 2
+var FALSE = 3
+var LOAD_GLOBAL = 4
+var LOAD = 5
+var GET_FIELD = 6
+var ENTER_CLASS = 7
+var EXIT_CLASS = 8
+var DEFINE = 9
+var DEFINE_FIELD = 10
+var FUNCTION = 11
+var NOT_IMPLEMENTED = 12
+var EXIT = 13
+var DUP = 14
+var DROP = 15
+var SWAP = 16
+var MUL = 17
+var DIV = 18
+var MOD = 19
+var ADD = 20
+var SUB = 21
+var LT = 22
+var LE = 23
+var GT = 24
+var GE = 25
+var EQ = 26
+var NE = 27
+var IN = 28
+var NOT_IN = 29
+var NEG = 30
+var NOT = 31
+var FUNCTION_CALL = 32
+var METHOD_CALL = 33
+var GET_SLICE = 34
+var GET_INDEX = 35
+var SELF = 36
+var SUPER_CALL = 37
+var SIZEOF = 38
+var NEW = 39
+var INSTANCEOF = 40
+var ARRAY_NEW = 41
+var ARRAY_NEW_APPEND = 42
+var TABLE_NEW = 43
+var TABLE_NEW_INSERT = 44
+var CONST = 45
+var RETURN = 46
+var INSERT = 47
+var APPEND = 48
+var STORE_GLOBAL = 49
+var STORE = 50
+var SET_STATIC = 51
+var SET_FIELD = 52
+var SET_SLICE = 53
+var SET_INDEX = 54
+var GET_FIELD_TOP = 55
+var GET_INDEX_TOP = 56
+var GET_STATIC = 57
+var GET_STATIC_TOP = 58
+var IF = 59
+var JUMP = 60
+var LOOP = 61
+var ZERO = 62
+var INC = 63
+var OR = 64
+var AND = 65
+var SET_INDEX_AU = 66
+var SET_FIELD_AU = 67
+var SET_STATIC_AU = 68
+var ARRAY_CLOSE = 69
+var TABLE_CLOSE = 70

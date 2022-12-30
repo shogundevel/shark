@@ -1,0 +1,16 @@
+
+Imagine a programming language with the syntax of python, the hability to run in the browser and whose package has the size and speed of lua. Welcome to shark :>
+
+Shark was born in an attempt to fix some python issues I have spotted with the years:
+* Python is slow: Shark can run in a new virtual machine written from scratch in C, what gives it a nice 10-12x speed boost when compared to python. (Benchmark is based on how fast the self hosted shark compiler can compile itself when running on python versus when running in the virtual machine).
+* Python is too big/has too many dependences: The shark virtual machine, standard libraries and development tools can be packaged in a free of dependences 50 KB package.
+* Python can't be used in the browser: The shark compiler can generate very portable javascript code that runs on all kinds of plataforms, even the oldest browsers and ECMAScript enviroments (like ActionScript 2) can be targeted without much effort.
+* Python is not good for games and GUI based applications: Shark comes with a tiny 2D game framework that can be used to write small games and aplications. Most javascript libraries and frameworks for gaming and UI can be used painlessly from shark, this includes web-based libraries and native Android/IOS frameworks as well.
+
+Moreover:
+* Shark is backwards compatible with existing python and lua environments by means of cross-compiling back to them.
+* The shark virtual machine is not only available from C but also has an implementation that runs in the java virtual machine. This is an official port so it's not going to become unmaintained/deprecated as shark evolves.
+
+Want to get started?
+* Start by reading the_shark_handbook to learn the basics of shark programming.
+* Follow by reading the 'guide' file, you will find instructions on getting and using the shark tools to start writting shark code.

@@ -1,0 +1,48 @@
+
+import shark.activity: activity
+import shark.asset: load_texture
+import shark.event
+
+var w = load_texture("w.png")
+var b = load_texture("b.png")
+
+class main_activity (activity)
+    function launch()
+        self.rotation = 0
+        self.scale = 1
+        self.up = false
+        self.down = false
+        self.left = false
+        self.right = false
+    
+    function event(type, x, y)
+        if type == event::E_PRESS_UP then
+            self.up = true
+        else if type == event::E_PRESS_DOWN then
+            self.down = true
+        else if type == event::E_PRESS_LEFT then
+            self.left = true
+        else if type == event::E_PRESS_RIGHT then
+            self.right = true
+        else if type == event::E_REL_UP then
+            self.up = false
+        else if type == event::E_REL_DOWN then
+            self.down = false
+        else if type == event::E_REL_LEFT then
+            self.left = false
+        else if type == event::E_REL_RIGHT then
+            self.right = false
+    
+    function update()
+        if self.up then
+            self.scale += 0.02
+        if self.down then
+            self.scale -= 0.02
+        if self.left then
+            self.rotation += 5
+        if self.right then
+            self.rotation -= 5
+    
+    function render()
+        self.draw_ex(w, 160, 96, 0, 0, 0, 5, 3)
+        self.draw_ex(b, 160, 96, 0, 0, self.rotation, self.scale, self.scale)

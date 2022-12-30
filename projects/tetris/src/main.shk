@@ -1,0 +1,185 @@
+
+import shark.activity: activity
+import shark.asset
+import shark.event
+
+import system.math
+import system.util: copy
+import system.string: itos
+
+var square = asset::load_texture("square.png")
+var bg = asset::load_texture("bg.png")
+var font = asset::load_font("courier_new.ttf", 12, 0x0)
+
+var piece_data = [[[[true, true, true, true]],
+                    [[true], [true], [true], [true]]],
+                  [[[true, true], [true, true]]],
+                  [[[true, true, false], [false, true, true]],
+                    [[false, true], [true, true], [true, false]]],
+                  [[[false, true, true], [true, true, false]],
+                    [[true, false], [true, true], [false, true]]],
+                  [[[true, true, true], [false, false, true]],
+                    [[true, true], [true, false], [true, false]],
+                    [[true, false, false], [true, true, true]],
+                    [[false, true], [false, true], [true, true]]],
+                  [[[false, false, true], [true, true, true]],
+                    [[true, true], [false, true], [false, true]],
+                    [[true, true, true], [true, false, false]],
+                    [[true, false], [true, false], [true, true]]],
+                  [[[true, true, true], [false, true, false]],
+                    [[true, false], [true, true], [true, false]],
+                    [[false, true, false], [true, true, true]],
+                    [[false, true], [true, true], [false, true]]]]
+
+var W = 10
+var H = 12
+var EVENT_MAX = 3
+
+class main_activity (activity)
+    function launch()
+        self.new_game()
+        self.left_down = false
+        self.right_down = false
+        self.down_down = false
+        self.event_time = 0
+    
+    function new_game()
+        var line_data = [ ]
+        for _ in range(H) do
+            line_data << false
+        self.board = [ ]
+        for _ in range(W) do
+            self.board << copy(line_data)
+        self.score = 0
+        self.next_piece = math::random(sizeof(piece_data))
+        self.next_r = math::random(sizeof(piece_data[self.next_piece]))
+        self.new_piece()
+        self.speed = 24
+        self.current_time = 0
+    
+    function new_piece()
+        self.piece = piece_data[self.next_piece]
+        self.r = self.next_r
+        self.next_piece = math::random(sizeof(piece_data))
+        self.next_r = math::random(sizeof(piece_data[self.next_piece]))
+        self.x = math::random(sizeof(self.board) - sizeof(self.piece[self.r]))
+        self.y = 0
+        if self.collision() then
+            self.new_game()
+    
+    function event(type, x, y)
+        if type == event::E_PRESS_LEFT then
+            self.left_down = true
+            self.event_time = EVENT_MAX
+        else if type == event::E_PRESS_RIGHT then
+            self.right_down = true
+            self.event_time = EVENT_MAX
+        else if type == event::E_PRESS_DOWN then
+            self.down_down = true
+        else if type == event::E_REL_LEFT then
+            self.left_down = false
+        else if type == event::E_REL_RIGHT then
+            self.right_down = false
+        else if type == event::E_REL_DOWN then
+            self.down_down = false
+        else if type == event::E_PRESS_UP then
+            self.rotate()
+    
+    function update()
+        self.current_time += 1
+        self.event_time += 1
+        if self.event_time >= EVENT_MAX then
+            self.event_time -= EVENT_MAX
+            if self.left_down then
+                self.move(-1, 0)
+            if self.right_down then
+                self.move(1, 0)
+            if self.down_down then
+                self.move(0, 1)
+        if self.down_down then
+            self.move(0, 1)
+        if self.current_time >= self.speed then
+            self.current_time -= self.speed
+            self.advance()
+    
+    function advance()
+        if not self.move(0, 1) then
+            self.freeze()
+            self.new_piece()
+    
+    function rotate()
+        var r = self.r
+        self.r = (self.r + 1) % sizeof(self.piece)
+        if self.collision() then
+            self.r = r
+    
+    function move(x, y)
+        self.x += x
+        self.y += y
+        var collision = self.collision()
+        if collision then
+            self.x -= x
+            self.y -= y
+            return false
+        else
+            return true
+    
+    function collision()
+        var shape = self.piece[self.r]
+        if W < self.x + sizeof(shape) or self.x < 0 then
+            return true
+        else if H < self.y + sizeof(shape[0]) then
+            return true
+        for x in range(sizeof(shape)) do
+            var vertical = shape[x]
+            for y in range(sizeof(vertical)) do
+                if vertical[y] and self.board[self.x + x][self.y + y] then
+                    return true
+        return false
+    
+    function freeze()
+        var shape = self.piece[self.r]
+        for x in range(sizeof(shape)) do
+            var vertical = shape[x]
+            for y in range(sizeof(vertical)) do
+                if vertical[y] then
+                    self.board[self.x + x][self.y + y] = true
+        self.clear_lines()
+    
+    function clear_lines()
+        for y in range(H) do
+            var clear = true
+            for x in range(W) do
+                if not self.board[x][y] then
+                    clear = false
+                    break
+            if clear then
+                self.score += 1
+                for x in range(W) do
+                    var z = y
+                    while z > 0 do
+                        self.board[x][z] = self.board[x][z - 1]
+                        z -= 1
+                    self.board[x][0] = false
+                self.speed = math::max(24 - self.score, 8)
+    
+    function render()
+        self.draw(bg, 0, 0)
+        for x in range(sizeof(self.board)) do
+            var vertical = self.board[x]
+            for y in range(sizeof(vertical)) do
+                if vertical[y] then
+                    self.draw(square, 80 + x * 16, 0 + y * 16)
+        var data = self.piece[self.r]
+        for x in range(sizeof(data)) do
+            var vertical = data[x]
+            for y in range(sizeof(vertical)) do
+                if vertical[y] then
+                    self.draw(square, 80 + (self.x + x) * 16, 0 + (self.y + y) * 16)
+        var next_piece_data = piece_data[self.next_piece][self.next_r]
+        for x in range(sizeof(next_piece_data)) do
+            var vertical = next_piece_data[x]
+            for y in range(sizeof(vertical)) do
+                if vertical[y] then
+                    self.draw(square, 248 + x * 16, 8 + y * 16)
+        self.draw_text(itos(self.score), font, 260, 90)
