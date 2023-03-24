@@ -16,5 +16,10 @@ Want to get started?
 * Follow by reading the 'guide' file, you will find instructions on getting and using the shark tools to start writting shark code.
 
 Notice that this version of shark is considered GREEN or stable and little changes are made to it unless a Shark Community Process (SCP) proposal is greenlighted.
-This repo contains binaries for the shark SDK appart from the full source code of such binaries. You can start ising it inmediately by downloading it as a ZIP and then unzipping it to the directory of preference.
+
+This repo contains binaries for the shark SDK appart from the full source code of such binaries. You can start using it inmediately by downloading it as a ZIP and then unzipping it to the directory of preference.
+
 If you want further help with anything related to shark or want to start contributing its a good idea to visit sharkhosted.proboards.com, the informal shark related board.
+
+Cheers,
+- ShogunDevel
