@@ -19,11 +19,13 @@ Overall, Shark is a very versatile language that can be used to build web/deskto
 
 This example iterates the command line arguments and displays a greeting for each name it contains:
 
+```[code]
 import system.io: printf
 
 function main(args)
     for name in args do
         printf("Hello, %!", [name])
+```
 
 ## Getting Started
 
