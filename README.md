@@ -15,6 +15,16 @@ Overall, Shark is a very versatile language that can be used to build web/deskto
 * Backwards compatible with Python and Lua libraries and environments by means of targeting them as compilation output
 * Official And Builtin Java Virtual Machine implementation
 
+## Simple Example
+
+This example iterates the command line arguments and displays a greeting for each name it contains:
+
+import system.io: printf
+
+function main(args)
+    for name in args do
+        printf("Hello, %!", [name])
+
 ## Getting Started
 
 To get started with Shark, read the Shark Handbook in this repo to learn the basics of Shark programming. Then, read the **guide** file for instructions on using the Shark toolchain to start writing Shark code.
