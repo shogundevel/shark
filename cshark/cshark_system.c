@@ -404,7 +404,7 @@ SHARK_NATIVE(itos)
 {
     SHARK_ASSERT_INT(args[0], vm, "argument 1 of 'itos'");
     char itos[SHARK_BUFFER_MAX];
-    size_t length = sprintf(itos, "%d", SHARK_AS_INT(args[0]));
+    size_t length = sprintf(itos, "%ld", SHARK_AS_INT(args[0]));
     if (length > SHARK_BUFFER_MAX)
         shark_fatal_error(vm, "buffer overflow.");
     return SHARK_FROM_PTR(shark_string_new_from_byte_str(length, itos));
@@ -663,7 +663,7 @@ SHARK_API shark_string *shark_string_format(shark_string *format, shark_array *a
                 shark_fatal_error(NULL, "incomplete format.");
             shark_value value = args->data[arg_pointer++];
             if (SHARK_IS_INT(value)) {
-                repr_size = sprintf(temp, "%d", SHARK_AS_INT(value));
+                repr_size = sprintf(temp, "%ld", SHARK_AS_INT(value));
                 if (repr_size > 256)
                     shark_fatal_error(NULL, "buffer overflow.");
                 repr = temp;
