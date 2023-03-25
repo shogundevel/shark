@@ -267,10 +267,11 @@ Notice that if the condition is false from the start the statement will execute 
 
 The for statement has three forms in standard shark: the range(end) from, the range(start, end) form and the list form. All three forms take a name followed by the in keyword followed by an expression or range expression followed by the do keyword. The statement will repeat its block for each element in the range or list expression, assigning each value to the variable named in the statement.
 
-Range expressions are used only in a for loop to indicate the range of integers the loop iterates over, in increments of one. It can take the range(end) form to iterate in the range zero to end or the range(start, end) from to iterate in the range start to end. For instance:
+Range expressions are used only in a for loop to indicate the range of integers the loop iterates over, in increments of one. It can take the range(end) form to iterate in the range zero to end - 1 or the range(start, end) from to iterate in the range start to end - 1. For instance:
 var square_list = [ ]
 for value in range(1, 100) do
 	square_list << value * value
+Will iterate starting at 1 and doing the last iteration at 99, effectively stopping when 100 - 1 = 99 iterations occurred.
 
 If the for statement is not given a range expression the compiler will assume a list is provided, and the statement will iterate each value of the list. For instance:
 var number_list = [0, 32, 128]
@@ -293,7 +294,7 @@ for x in range(sizeof(data)) do
      data[x] = min_value
 This example sorts a list of numbers using two nested for loops.
 
-You can use the pass keyword to provide an empty block for a composed statement, the empty block will just do nothing. It’s illegal to follow the pass keyword with more statements or declarations. For instance:
+You can use the pass keyword to provide an empty block for a composed statement; the empty block will just do nothing. It’s illegal to follow the pass keyword with more statements or declarations. For instance:
 while not ready do
 	pass
 
@@ -1069,20 +1070,16 @@ Font objects are defined by the font class of the shark.text module as follows:
 class font
      function get_height()
      	Gets the height of this font object in pixels. This refers to the actual height in pixels of a text line rendered using this font and may differ from the height passed to load_font in the size argument.
-     
-     function get_width(data)
-     	Computes the width of the string data, this is, the final size that such text will have if rendered using this font.
 
 This example renders some text using a loaded font and draws it to the screen:
 import shark.activity: activity
 import shark.asset: load_texture, load_font
 var bg = load_texture(“bg.png”)
 var font = load_font(“courier_new.ttf”, 12, 0xFF)
-var text = font.render(“Hello, world!”)
 class main_activity (activity)
 	function render()
 		self.draw(bg, 0, 0)
-		self.draw(text, 80, 180)
+		self.draw_text(“Hello, world!”, 80, 180)
 
 Chapter 3.5
 Events
@@ -1175,19 +1172,15 @@ var font = asset::load_font(“courier_new.ttf”, 12, 0xFF)
 var center_x = floor(320 / 2)
 var center_y = floor(192 / 2)
 var touch_text = null
-var touch_x = 0
-var touch_y = 0
+var touch_x = 12
+var touch_y = 12
 var button_text = null
-var button_x = 0
-var button_y = 0
+var button_x = 12
+var button_y = 36
 function set_touch_text(text)
-	touch_text = font.render(text)
-     touch_x = center_x - floor(touch_text.get_size_x() / 2)
-     touch_y = center_y - touch_text.get_size_y() – 5
+	touch_text = text
 function set_button_text(text)
-	button_text = font.render(text)
-     button_x = center_x - floor(button_text.get_size_x() / 2)
-     button_y = center_y + 5
+	button_text = text
 set_touch_text(“You have not pressed the screen yet.”)
 set_button_text(“You have not pressed any buttons yet.”)
 class main_activity (activity)
@@ -1198,8 +1191,8 @@ class main_activity (activity)
 			set_button_text(format(“You have %.”, [button_table[type]]))
 	function render()
 		self.draw(bg, 0, 0)
-		self.draw(touch_text, touch_x, touch_y)
-		self.draw(button_text, button_x, button_y)
+		self.draw_text(touch_text, touch_x, touch_y)
+		self.draw_text(button_text, button_x, button_y)
 
 Chapter 3.6
 Data Persistence
