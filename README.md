@@ -3,6 +3,7 @@
 Welcome to the Shark programming language! Shark is a language designed to provide the speed and size of Lua, while also offering the familiar syntax of Python. 
 
 The ability to run in the browser is a plus, made possible by shark's self-hosted compiler.
+
 Overall, Shark is a very versatile language that can be used to build web/desktop/mobile applications, multi-platform games (Write once, run anywhere!), servers, command line tools and more.
 
 ## Features
