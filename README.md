@@ -33,7 +33,7 @@ This version of Shark is considered stable (green), and major changes will only 
 
 This repository contains the Shark SDK binaries and the full source code for these binaries. To start using Shark, download the repository as a ZIP file and extract it to your preferred directory.
 
-If you need further help with Shark or want to start contributing, use github's builtin Discussions or visit the sharkhosted forum at <a href="https://sharkhosted.proboards.com">sharkhosted.proboards.com</a>.
+If you need further help with Shark or want to start contributing, file an issue here on GH with your questions or suggestions.
 
 Cheers, <br>
 \- ShogunDevel
