@@ -806,6 +806,7 @@ SHARK_API shark_string *shark_path_get_base(shark_string *path)
     if (index < 0) index = 0;
     shark_string *base = shark_string_new_with_size(index);
     memcpy(base->data, path->data, index);
+    shark_string_init(base);
     return base;
 }
 
@@ -819,6 +820,7 @@ SHARK_API shark_string *shark_path_get_tail(shark_string *path)
     size_t size = path->size - index + 1;
     shark_string *tail = shark_string_new_with_size(size);
     memcpy(tail->data, path->data + index + 1, size);
+    shark_string_init(tail);
     return tail;
 }
 
