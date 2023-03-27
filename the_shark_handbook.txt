@@ -870,6 +870,9 @@ function puts(data)
 function printf(data, args)
 	Formats the string data using args using the same algorithm than the format function of the system.string module and displays the result in the console.
 
+function read_line()
+	Reads a line of input text from the console.
+
 class text_file
      A text_file object binds a file in the filesystem and an internal text buffer that writes or reads to it. It defines no init function so it can’t be instantiated by usual means.
      
