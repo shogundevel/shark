@@ -212,10 +212,11 @@ SHARK_NATIVE(listdir)
     shark_string *tail = shark_string_new_from_cstr("*");
     shark_string *pattern = shark_path_join(path, tail);
     shark_object_dec_ref(tail);
+    
     WIN32_FIND_DATA find_data;
     HANDLE find_handle;
     
-    if ((find_handle = FindFirstFileA(path->data, &find_data)) == INVALID_HANDLE_VALUE)
+    if ((find_handle = FindFirstFileA(pattern->data, &find_data)) == INVALID_HANDLE_VALUE)
         return SHARK_NULL;
     do {
         shark_string *filename = shark_string_new_from_cstr(find_data.cFileName);

@@ -36,6 +36,27 @@ import sharkemu.library: library
 import sharkemu.nodes: call_function
 import sharkemu.runtime: runtime_state, module_object
 
+function play()
+    puts("Now running sharkemu in eval mode, type shark code to evaluate it. An empty line terminates a multi-line construct. Please use spaces and not tabs to indent your code. Type 'exit' to quit sharkemu. Have fun!\n")
+    var code = { }
+    var backend = new compiler (code)
+    var state = new runtime_state (code, library)
+    state.module_context = new module_object ("<console>")
+    state.context = state.module_context
+    while true do
+        var input = [ "" ]
+        while true do
+            puts(">> ")
+            var line = read_line()
+            input << line
+            if line == "" or line == "\n" or line == "\r" or line == "\r\n" then
+                break
+            else if line == "exit" then
+                return
+        var data = string::join("\n", input)
+        __compiler.compile_string(data, backend)
+        code["input"].eval(state)
+
 function main(args)
     if sizeof(args) < 2 then
         printf("Usage: sharkemu <filename> <args>\n", [args[0]])
@@ -44,25 +65,7 @@ function main(args)
         var r = read_line()
         if r != "" and r != "\n" and r != "\r" and r != "\n\r" then
             return
-        puts("Now running sharkemu in eval mode, type shark code to evaluate it. An empty line terminates a multi-line construct. Please use spaces and not tabs to indent your code. Type 'exit' to quit sharkemu. Have fun!\n")
-        var code = { }
-        var backend = new compiler (code)
-        var state = new runtime_state (code, library)
-        state.module_context = new module_object ("<console>")
-        state.context = state.module_context
-        while true do
-            var input = [ "" ]
-            while true do
-                puts("> ")
-                var line = read_line()
-                input << line
-                if line == "" or line == "\n" or line == "\r" or line == "\r\n" then
-                    break
-                else if line == "exit" then
-                    return
-            var data = string::join("\n", input)
-            __compiler.compile_string(data, backend)
-            code["input"].eval(state)
+        play()
     else
         var filename = args[1]
         var code = { }

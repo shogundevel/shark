@@ -1,0 +1,99 @@
+################################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import system.string
+import system.util
+
+import system.io: printf
+
+import sharkenv.builtin
+
+var exec_name = "sharkenv.shk"
+
+var command_table = {
+    "mkdir": builtin::mkdir,
+    "rmdir": builtin::rmdir,
+    "unlink": builtin::unlink,
+    "exit": builtin::exit,
+    "echo": builtin::echo
+}
+
+function clear(line)
+    if string::index(line, string::len(line) - 1) == '\r' then
+        return string::slice(line, 0, string::len(line) - 1)
+    return line
+
+function exec(line)
+    if line == "" then
+        return
+    var data = string::split(clear(line), ' ')
+    var name = data[0]
+    if name == "" then
+        return
+    var args = util::slice(data, 1, sizeof(data))
+    if name not in command_table then
+        printf("unknown command '%'\n", [name])
+        return
+    args[0] << exec_name
+    command_table[name](args)
+
+function make(code, action)
+    var lines = string::split(code, '\n')
+    if action != null then
+        var codes = { }
+        var current_name = null
+        var current_code = [ ]
+        for line in lines do
+            if line == "" or line == "\r" then
+                continue
+            else if string::index(line, 0) == '#' then
+                continue
+            else if string::index(line, 0) == ':' then
+                if current_name != null then
+                    codes[current_name] = current_code
+                current_name = clear(line)
+                current_name = string::slice(current_name, 1, string::len(current_name))
+                current_code = [ ]
+            else
+                current_code << line
+        if current_name != null then
+            codes[current_name] = current_code
+        if action not in codes then
+            printf("unknown action '%'\n", [action])
+            return
+        var action_code = codes[action]
+        for line in action_code do
+            exec(line)
+    else
+        for line in lines do
+            if line == "" or line == "\r" then
+                continue
+            else if string::index(line, 0) == '#' then
+                continue
+            else if string::index(line, 0) == ':' then
+                continue
+            else
+                exec(line)

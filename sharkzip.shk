@@ -102,12 +102,23 @@ function write_dir(input, target)
             puts("warning: the input file seems corrupted.\n")
             return
 
-function unzip(object, target)
-    var input = open(object, "rb")
-    if input == null then
-        printf("can't open input file '%' for reading, operation aborted.", [target])
-        return
+function unzip(input, target)
     input.read(5)
     mkdir(target)
     write_dir(input, target)
     input.close()
+
+function main(args)
+    if sizeof(args) != 3 then
+        puts("usage: zip <source> <target>\n")
+        puts("\tzip/unzip a file or directory using sharkzip algorithm.\n")
+        puts("\tif <source> points to a file, it will be interpreted as a zipped file to be unzipped at <target>.\n")
+        puts("\tif <source> is not a file a directory is assumed, and will be zipped into <target>\n")
+        return
+    var source = args[1]
+    var target = args[2]
+    var object = open(args[1], "rb")
+    if object != null then
+        unzip(object, target)
+    else
+        zip(source, target)
