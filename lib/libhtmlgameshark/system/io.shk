@@ -24,11 +24,16 @@
 ## 
 ################################################################################
 
-import system.error
-import system.exit
-import system.io
-import system.math
-import system.path
 import system.string
-import system.time
-import system.util
+
+var console
+var prompt
+
+function puts(data)
+    console::log(data)
+
+function printf(data, args)
+    console::log(string::format(data, args))
+
+function read_line()
+    return prompt("")

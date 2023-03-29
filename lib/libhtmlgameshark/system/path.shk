@@ -24,11 +24,17 @@
 ## 
 ################################################################################
 
-import system.error
-import system.exit
-import system.io
-import system.math
-import system.path
-import system.string
-import system.time
-import system.util
+function get_base(path)
+function get_tail(path)
+
+function get_ext(path)
+function remove_ext(path)
+
+function join(base, tail)
+
+function listdir(path)
+
+function mkdir(path)
+function rmdir(path)
+
+function unlink(filename)

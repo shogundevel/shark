@@ -52,6 +52,25 @@ var op_priority = {
 
 var unary_operators = {"not", "-"}
 
+class string_proxy
+    function init(data)
+        self.data = data
+        self.size = string::len(data)
+        self.index = 0
+    
+    function fetch()
+        if self.index >= self.size then
+            return '\0'
+        var c = string::index(self.data, self.index)
+        self.index += 1
+        return c
+    
+    function at_end()
+        return self.index >= self.size
+    
+    function close()
+        pass
+
 class compiler
     var backend
     var include
@@ -92,6 +111,14 @@ class compiler
         if source == null then
             compiler_error(format("can't open file '%' for reading, compilation aborted.", [main]))
         self.source_file(main, source)
+        self.backend.close()
+    
+    function compile_string(data, backend)
+        self.backend = backend
+        self.include = null
+        self.backend.start(self, "input.shk", null)
+        var source = new string_proxy (data)
+        self.source_file("input.shk", source)
         self.backend.close()
     
     function error(message)
@@ -183,13 +210,14 @@ class compiler
     
     function import_decl()
         var import_path = self.import_path()
-        var filename = path::join(self.include, string::concat(string::join("/", import_path), ".shk"))
-        if filename not in self.record then
-            var source = open(filename, "r")
-            if source != null then
-                self.backend.begin_source(import_path)
-                self.source_file(filename, source)
-                self.backend.end_source()
+        if self.include != null then
+            var filename = path::join(self.include, string::concat(string::join("/", import_path), ".shk"))
+            if filename not in self.record then
+                var source = open(filename, "r")
+                if source != null then
+                    self.backend.begin_source(import_path)
+                    self.source_file(filename, source)
+                    self.backend.end_source()
         var alias = null
         var target = null
         if self.match("->") then

@@ -31,37 +31,26 @@ import system.string: format
 
 import sharkc
 import sharklink
+import sharkemu
 
 function main(args)
     if sizeof(args) < 2 then
         printf("usage: % <command> <args>\n", [args[0]])
         puts("where <command> may be any of the following:\n")
-        puts("\tinstall <libs>\n")
-        puts("\tuninstall <libs>\n")
+        puts("\trun <filename> <args>\n")
         puts("\tcompile <target> <filename> <out>\n")
         puts("\tlink <target> <source> <main> <out> <libs>\n")
-        puts("\tbuild <filename> <out> <libs>")
+        puts("\tbuild <filename> <out> <libs>\n")
+        puts("\tinstall <libs>\n")
+        puts("\tuninstall <libs>\n")
         return
     var filename = args[0]
     var base = get_base(args[0])
     var command = args[1]
     args = slice(args, 2, sizeof(args))
-    if command == "install" then
-        for lib in args do
-            if get_ext(lib) != ".shar" then
-                printf("can't install invalid library file '%', expected a shark archive (.shar).\n", [lib])
-            else
-                var source = sharklink::fopen(lib, "rb")
-                var target = sharklink::fopen(join(base, get_tail(lib)), "wb")
-                sharklink::fread(source, target)
-                target.close()
-    else if command == "uninstall" then
-        for lib in args do
-            if get_ext(lib) != ".shar" then
-                printf("can't uninstall invalid library file '%', expected a shark archive (.shar).\n", [lib])
-            else
-                if not unlink(join(base, lib)) then
-                    printf("unknown library file '%'.\n", [lib])
+    if command == "run" then
+        args[0] << format("% %", [filename, command])
+        sharkemu::main(args)
     else if command == "compile" then
         args[0] << format("% %", [filename, command])
         sharkc::main(args)
@@ -82,5 +71,21 @@ function main(args)
         extend(link_args, libs)
         sharklink::main(link_args)
         unlink(bin)
+    else if command == "install" then
+        for lib in args do
+            if get_ext(lib) != ".shar" then
+                printf("can't install invalid library file '%', expected a shark archive (.shar).\n", [lib])
+            else
+                var source = sharklink::fopen(lib, "rb")
+                var target = sharklink::fopen(join(base, get_tail(lib)), "wb")
+                sharklink::fread(source, target)
+                target.close()
+    else if command == "uninstall" then
+        for lib in args do
+            if get_ext(lib) != ".shar" then
+                printf("can't uninstall invalid library file '%', expected a shark archive (.shar).\n", [lib])
+            else
+                if not unlink(join(base, lib)) then
+                    printf("unknown library file '%'.\n", [lib])
     else
         printf("unknown command '%'.", [command])

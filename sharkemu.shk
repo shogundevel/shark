@@ -1,0 +1,74 @@
+################################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import system.string
+import system.io: printf, puts, read_line
+import system.path: remove_ext, get_tail
+import system.util: slice
+
+import sharkc.compiler: __compiler
+import sharkc.compiler: compile
+import sharkemu.compiler: compiler
+import sharkemu.library: library
+import sharkemu.nodes: call_function
+import sharkemu.runtime: runtime_state, module_object
+
+function main(args)
+    if sizeof(args) < 2 then
+        printf("Usage: sharkemu <filename> <args>\n", [args[0]])
+        puts("\tCompiles and executes <filename> using software emulation.\n")
+        puts("Do you want to enter sharkemu in eval mode (enter any text to cancel, just hit enter without typing to accept)? ")
+        var r = read_line()
+        if r != "" and r != "\n" and r != "\r" and r != "\n\r" then
+            return
+        puts("Now running sharkemu in eval mode, type shark code to evaluate it. An empty line terminates a multi-line construct. Please use spaces and not tabs to indent your code. Type 'exit' to quit sharkemu. Have fun!\n")
+        var code = { }
+        var backend = new compiler (code)
+        var state = new runtime_state (code, library)
+        state.module_context = new module_object ("<console>")
+        state.context = state.module_context
+        while true do
+            var input = [ "" ]
+            while true do
+                puts("> ")
+                var line = read_line()
+                input << line
+                if line == "" or line == "\n" or line == "\r" or line == "\r\n" then
+                    break
+                else if line == "exit" then
+                    return
+            var data = string::join("\n", input)
+            __compiler.compile_string(data, backend)
+            code["input"].eval(state)
+    else
+        var filename = args[1]
+        var code = { }
+        compile(filename, new compiler (code), null)
+        var state = new runtime_state (code, library)
+        var main_module = code[remove_ext(get_tail(filename))].run(state)
+        state.context = main_module
+        if "main" in main_module.namespace then
+            call_function(state, main_module.namespace["main"], null, [slice(args, 1, sizeof(args))])

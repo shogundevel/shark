@@ -24,11 +24,4 @@
 ## 
 ################################################################################
 
-import system.error
-import system.exit
-import system.io
-import system.math
-import system.path
-import system.string
-import system.time
-import system.util
+function clock()

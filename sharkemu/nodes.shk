@@ -1,0 +1,604 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import system.io: puts, printf
+import system.error: ERR_NONE, ERR_UNKNOWN, set_err, get_err, error, pcall
+
+import sharkemu.runtime
+
+class module
+    function init(compiler, store, path)
+        self.compiler = compiler
+        self.store = store
+        self.path = path
+        self.imports = [ ]
+        self.store[self.path] = self
+        self.code = [ ]
+    
+    function run(state)
+        var object = new runtime::module_object (self.path)
+        var prev_module = state.module_context
+        var prev_context = state.context
+        state.module_context = object
+        state.context = object
+        state.import_record[self.path] = object
+        for import_decl in self.imports do
+            import_decl.run(state)
+        for node in self.code do
+            node.run(state)
+        state.module_context = prev_module
+        state.context = prev_context
+        return object
+    
+    function eval(state)
+        for import_decl in self.imports do
+            import_decl.run(state)
+        for node in self.code do
+            node.run(state)
+
+class import_decl
+    function init(name, import_path, alias, target)
+        self.name = name
+        self.import_path = import_path
+        self.alias = alias
+        self.target = target
+    
+    function run(state)
+        var target = state.import_module(self.import_path)
+        var name = self.name
+        if self.alias != null then
+            name = self.alias
+        if self.target == null then
+            state.module_context.namespace[name] = target
+        else
+            for name in self.target do
+                state.module_context.namespace[name] = target.namespace[name]
+
+class class_decl
+    function init(name, parent)
+        self.name = name
+        self.parent = parent
+        self.code = [ ]
+    
+    function run(state)
+        var parent = null
+        if self.parent != null then
+            parent = self.parent.run(state)
+        var object = new runtime::class_object (self.name, parent)
+        var prev_class = state.class_context
+        var prev_context = state.context
+        state.class_context = object
+        state.context = object
+        for node in self.code do
+            node.run(state)
+        state.class_context = prev_class
+        state.context = prev_context
+        state.context.namespace[self.name] = object
+
+class var_decl
+    function init(name, exp)
+        self.name = name
+        self.exp = exp
+    
+    function run(state)
+        if self.exp != null then
+            state.context.namespace[self.name] = self.exp.run(state)
+        else
+            state.context.namespace[self.name] = null
+
+class function_decl
+    function init(name, args, impl)
+        self.name = name
+        self.args = args
+        self.impl = impl
+        self.code = [ ]
+
+    function run(state)
+        state.context.namespace[self.name] = new runtime::function_object (state.module_context, self.name, self.args, self.impl, self.code)
+
+class block
+    function init(parent)
+        self.parent = parent
+        self.code = [ ]
+
+    function run(state)
+        var block_object = new runtime::block_object (state.context)
+        state.context = block_object
+        for node in self.code do
+            node.run(state)
+            if state.break_flag or state.continue_flag or state.return_flag then
+                state.continue_flag = false
+                break
+        state.context = block_object.parent
+
+class if_stat
+    function init(parent, cond)
+        self.parent = parent
+        self.cond = cond
+        self.then_ = null
+        self.else_ = null
+
+    function run(state)
+        if self.cond.run(state) == true then
+            self.then_.run(state)
+        else if self.else_ != null then
+            self.else_.run(state)
+
+class while_stat
+    function init(parent, cond)
+        self.parent = parent
+        self.cond = cond
+        self.body = null
+
+    function run(state)
+        while self.cond.run(state) == true do
+            self.body.run(state)
+            if state.break_flag or state.return_flag then
+                state.break_flag = false
+                break
+
+class for_range
+    function init(parent, name, finish)
+        self.parent = parent
+        self.name = name
+        self.finish = finish
+        self.body = null
+
+    function run(state)
+        for value in range(self.finish.run(state)) do
+            state.context.namespace[self.name] = value
+            self.body.run(state)
+            if state.break_flag or state.return_flag then
+                state.break_flag = false
+                break
+
+class for_range_start
+    function init(parent, name, start, finish)
+        self.parent = parent
+        self.name = name
+        self.start = start
+        self.finish = finish
+        self.body = null
+
+    function run(state)
+        for value in range(self.start.run(state), self.finish.run(state)) do
+            state.context.namespace[self.name] = value
+            self.body.run(state)
+            if state.break_flag or state.return_flag then
+                state.break_flag = false
+                break
+
+class for_each
+    function init(parent, name, list)
+        self.parent = parent
+        self.name = name
+        self.list = list
+        self.body = null
+
+    function run(state)
+        for value in self.list.run(state) do
+            state.context.namespace[self.name] = value
+            self.body.run(state)
+            if state.break_flag or state.return_flag then
+                state.break_flag = false
+                break
+
+class break_stat
+    function init()
+        pass
+
+    function run(state)
+        state.break_flag = true
+
+class continue_stat
+    function init()
+        pass
+
+    function run(state)
+        state.continue_flag = true
+
+class return_stat
+    function init(value)
+        self.value = value
+
+    function run(state)
+        if self.value == null then
+            state.return_value = null
+        else
+            state.return_value = self.value.run(state)
+        state.return_flag = true
+
+class append
+    function init(target, value)
+        self.target = target
+        self.value = value
+
+    function run(state)
+        self.target.run(state) << self.value.run(state)
+
+class insert
+    function init(target, index, value)
+        self.target = target
+        self.index = index
+        self.value = value
+
+    function run(state)
+        self.target.run(state)[self.index.run(state)] << self.value.run(state)
+
+class binary_op
+    function init(x, y)
+        self.x = x
+        self.y = y
+
+class binary_op_null (binary_op)
+    function run(state)
+        return self.y.run(state)
+
+class binary_op_star (binary_op)
+    function run(state)
+        return self.x.run(state) * self.y.run(state)
+
+class binary_op_slash (binary_op)
+    function run(state)
+        return self.x.run(state) / self.y.run(state)
+
+class binary_op_mod (binary_op)
+    function run(state)
+        return self.x.run(state) % self.y.run(state)
+
+class binary_op_plus (binary_op)
+    function run(state)
+        return self.x.run(state) + self.y.run(state)
+
+class binary_op_minus (binary_op)
+    function run(state)
+        return self.x.run(state) - self.y.run(state)
+
+class binary_op_in (binary_op)
+    function run(state)
+        return self.x.run(state) in self.y.run(state)
+
+class binary_op_not_in (binary_op)
+    function run(state)
+        return self.x.run(state) not in self.y.run(state)
+
+class binary_op_gt (binary_op)
+    function run(state)
+        return self.x.run(state) > self.y.run(state)
+
+class binary_op_ge (binary_op)
+    function run(state)
+        return self.x.run(state) >= self.y.run(state)
+
+class binary_op_lt (binary_op)
+    function run(state)
+        return self.x.run(state) < self.y.run(state)
+
+class binary_op_le (binary_op)
+    function run(state)
+        return self.x.run(state) <= self.y.run(state)
+
+class binary_op_eq (binary_op)
+    function run(state)
+        return self.x.run(state) == self.y.run(state)
+
+class binary_op_ne (binary_op)
+    function run(state)
+        return self.x.run(state) != self.y.run(state)
+
+class binary_op_and (binary_op)
+    function run(state)
+        return self.x.run(state) and self.y.run(state)
+
+class binary_op_or (binary_op)
+    function run(state)
+        return self.x.run(state) or self.y.run(state)
+
+class unary_op
+    function init(x)
+        self.x = x
+
+class unary_op_not (unary_op)
+    function run(state)
+        return not self.x.run(state)
+
+class unary_op_minus (unary_op)
+    function run(state)
+        return -self.x.run(state)
+
+function call_function(state, callee, self_object, args)
+    if instanceof(callee, runtime::native_function_object) then
+        if self_object != null then
+            args[0] << self_object.child
+        return pcall(callee.code, args)
+    else
+        var prev_context = state.context
+        var prev_self = state.self_object
+        state.context = callee.context
+        state.self_object = self_object
+        var block_object = new runtime::block_object (state.context)
+        for index in range(sizeof(callee.args)) do
+            block_object.namespace[callee.args[index]] = args[index]
+        state.context = block_object
+        var return_value = null
+        for node in callee.code do
+            node.run(state)
+            if state.return_flag then
+                return_value = state.return_value
+                state.return_flag = false
+                state.return_value = null
+                break
+        state.self_object = prev_self
+        state.context = prev_context
+        return return_value
+
+class function_call
+    function init(callee, args)
+        self.callee = callee
+        self.args = args
+
+    function run(state)
+        var callee = self.callee.run(state)
+        var args = [ ]
+        for arg in self.args do
+            args << arg.run(state)
+        return call_function(state, callee, null, args)
+
+class get_index
+    function init(target, index)
+        self.target = target
+        self.index = index
+
+    function run(state)
+        return self.target.run(state)[self.index.run(state)]
+
+class set_index
+    function init(target, index, value)
+        self.target = target
+        self.index = index
+        self.value = value
+
+    function run(state)
+        self.target.run(state)[self.index.run(state)] = self.value.run(state)
+
+class get_field
+    function init(target, field)
+        self.target = target
+        self.field = field
+
+    function run(state)
+        return self.target.run(state).namespace[self.field]
+
+class set_field
+    function init(target, field, value)
+        self.target = target
+        self.field = field
+        self.value = value
+
+    function run(state)
+        self.target.run(state).namespace[self.field] = self.value.run(state)
+
+class method_call
+    function init(target, name, args)
+        self.target = target
+        self.name = name
+        self.args = args
+
+    function run(state)
+        var self_object = self.target.run(state)
+        var callee = self_object.class_type.namespace[self.name]
+        var args = [ ]
+        for arg in self.args do
+            args << arg.run(state)
+        return call_function(state, callee, self_object, args)
+
+class get_static
+    function init(target, name)
+        self.target = target
+        self.name = name
+
+    function run(state)
+        return self.target.run(state).namespace[self.name]
+
+class set_static
+    function init(target, name, value)
+        self.target = target
+        self.name = name
+        self.value = value
+
+    function run(state)
+        self.target.run(state).namespace[self.name] = self.value.run(state)
+
+class name_node
+    function init(name)
+        self.name = name
+
+    function run(state)
+        if instanceof(state.context, runtime::block_object) then
+            var target = state.context
+            while self.name not in target.namespace do
+                target = target.parent
+                if target == null then
+                    return null
+                if not instanceof(target, runtime::block_object) then
+                    break
+            var value = target.namespace[self.name]
+            return value
+        else
+            return state.context.namespace[self.name]
+
+class set_name
+    function init(name, value)
+        self.name = name
+        self.value = value
+
+    function run(state)
+        if instanceof(state.context, runtime::block_object) then
+            var target = state.context
+            while self.name not in target.namespace do
+                target = target.parent
+                if not instanceof(target, runtime::block_object) then
+                    break
+            target.namespace[self.name] = self.value.run(state)
+        else
+            state.context.namespace[self.name] = self.value.run(state)
+
+class self_exp
+    function init()
+        pass
+
+    function run(state)
+        if state.self_object == null then
+            puts("null self")
+        return state.self_object
+
+class super_call
+    function init(callee, args)
+        self.callee = callee
+        self.args = args
+
+    function run(state)
+        var self_object = state.self_object
+        var callee = self_object.class_type.parent.namespace[self.name]
+        var args = [ ]
+        for arg in self.args do
+            args << arg.run(state)
+        return call_function(state, callee, self_object, args)
+
+class sizeof_op
+    function init(exp)
+        self.exp = exp
+
+    function run(state)
+        return sizeof(self.exp.run(state))
+
+class new_op
+    function init(type, args)
+        self.type = type
+        self.args = args
+
+    function run(state)
+        var type = self.type.run(state)
+        var args = [ ]
+        for arg in self.args do
+            args << arg.run(state)
+        if type.create != null then
+            return new runtime::native_object (type, call_function(state, type.create, null, args))
+        else
+            var self_object = new runtime::object (type)
+            call_function(state, type.namespace["init"], self_object, args)
+            return self_object
+
+class instanceof_op
+    function init(value, type)
+        self.value = value
+        self.type = type
+
+    function run(state)
+        var value = self.value.run(state)
+        var type = self.type.run(state)
+        var object_class = value.class_type
+        while true do
+            if object_class == type then
+                return true
+            object_class = object_class.parent
+            if object_class == null then
+                break
+        return false
+
+class array_exp
+    function init(values)
+        self.values = values
+
+    function run(state)
+        var list = [ ]
+        for value in self.values do
+            list << value.run(state)
+        return list
+
+class table_exp
+    function init(keys, values)
+        self.keys = keys
+        self.values = values
+
+    function run(state)
+        var table = { }
+        for index in range(sizeof(self.keys)) do
+            var key = self.keys[index].run(state)
+            var value = true
+            if self.values[index] != null then
+                value = self.values[index].run(state)
+            table[key] = value
+        return table
+
+class nested_exp
+    function init(x)
+        self.x = x
+
+    function run(state)
+        return self.x.run(state)
+
+class null_exp
+    function init()
+        pass
+
+    function run(state)
+        return null
+
+class bool_exp
+    function init(x)
+        self.x = x
+
+    function run(state)
+        return self.x
+
+class int_exp
+    function init(x)
+        self.x = x
+
+    function run(state)
+        return self.x
+
+class float_exp
+    function init(x)
+        self.x = x
+
+    function run(state)
+        return self.x
+
+class char_exp
+    function init(x)
+        self.x = x
+
+    function run(state)
+        return self.x
+
+class str_exp
+    function init(x)
+        self.x = x
+
+    function run(state)
+        return self.x

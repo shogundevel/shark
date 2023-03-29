@@ -127,7 +127,6 @@ mouse_listener.onMouseMove = function () {
 Mouse.addListener(mouse_listener);
 
 this.onEnterFrame = function () {
-    trace(objects.length);
     for (var i = 0; i < objects.length; i++) {
         objects[i]._x = 0;
         objects[i]._y = 0;

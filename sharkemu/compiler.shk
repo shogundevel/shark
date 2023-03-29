@@ -1,0 +1,439 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import system.path
+
+import system.string
+import system.string: strbuf, concat, join, format, split
+
+import system.io: open, printf
+import system.util
+
+import sharkc.error: compiler_error
+import sharkemu.nodes
+
+var binary_op_table = {
+    "*": nodes::binary_op_star,
+    "/": nodes::binary_op_slash,
+    "%": nodes::binary_op_mod,
+    "+": nodes::binary_op_plus,
+    "-": nodes::binary_op_minus,
+    "in": nodes::binary_op_in,
+    "not": nodes::binary_op_not_in,
+    ">": nodes::binary_op_gt,
+    ">=": nodes::binary_op_ge,
+    "<": nodes::binary_op_lt,
+    "<=": nodes::binary_op_le,
+    "==": nodes::binary_op_eq,
+    "!=": nodes::binary_op_ne,
+    "and": nodes::binary_op_and,
+    "or": nodes::binary_op_or
+}
+
+var augmented_op_table = {
+    "=": nodes::binary_op_null,
+    "*=": nodes::binary_op_star,
+    "/=": nodes::binary_op_slash,
+    "%=": nodes::binary_op_mod,
+    "+=": nodes::binary_op_plus,
+    "-=": nodes::binary_op_minus
+}
+
+var unary_op_table = {
+    "not": nodes::unary_op_not,
+    "-": nodes::unary_op_minus
+}
+
+class compiler
+    function init(store)
+        self.compiler = null
+        self.parent = null
+        
+        self.store = store
+        self.block = null
+        self.source = null
+        self.class_context = null
+        self.function_context = null
+        self.block_context = null
+        self.block_current = null
+        self.node_context = null
+        self.if_context = null
+        
+        self.exp = null
+        self.exp_left = null
+        self.exp_base = null
+        self.call_stack = [ ]
+        self.call_args = null
+        self.values = null
+        self.keys = null
+    
+    function start(compiler, filename, out)
+        self.compiler = compiler
+        compiler.backend = self
+        self.enter_module(path::remove_ext(path::get_tail(filename)))
+    
+    function enter_module(import_path)
+        self.source = new nodes::module (compiler, self.store, import_path)
+        self.block = self.source.code
+    
+    function close()
+        pass
+    
+    function begin_source(import_path)
+        var generator = new compiler (self.store)
+        generator.compiler = self.compiler
+        generator.compiler.backend = generator
+        generator.parent = self
+        generator.enter_module(join(".", import_path))
+    
+    function end_source()
+        self.compiler.backend = self.parent
+    
+    function import_decl(import_path, alias, target)
+        self.source.imports << new nodes::import_decl (import_path[sizeof(import_path) - 1], join(".", import_path), alias, target)
+    
+    function name(name)
+        self.exp = new nodes::name_node (name)
+    
+    function get_static(field)
+        self.exp = new nodes::get_static (self.exp, field)
+    
+    function clear_exp()
+        self.exp = null
+    
+    function enter_class(name)
+        var parent = null
+        if self.exp != null then
+            parent = self.exp
+        self.class_context = new nodes::class_decl (name, parent)
+        self.block << self.class_context
+        self.block = self.class_context.code
+    
+    function exit_class(empty)
+        self.class_context = null
+        self.block = self.source.code
+    
+    function var_decl(name)
+        self.block << new nodes::var_decl (name, self.exp)
+    
+    function enter_function(name, args, has_body)
+        self.function_context = new nodes::function_decl (name, args, has_body)
+        if has_body then
+            self.block = self.function_context.code
+    
+    function exit_function()
+        if self.class_context == null then
+            self.block = self.source.code
+        else
+            self.block = self.class_context.code
+        self.block << self.function_context
+        self.function_context = null
+    
+    function enter_block()
+        self.block_context = new nodes::block (self.block_context)
+        self.block = self.block_context.code
+    
+    function exit_block()
+        self.block_current = self.block_context
+        self.block_context = self.block_context.parent
+        if self.block_context != null then
+            self.block = self.block_context.code
+        else if self.function_context != null then
+            self.block = self.function_context.code
+        else if self.class_context != null then
+            self.block = self.class_context.code
+        else
+            self.block = self.source.code
+    
+    function pass_decl()
+        pass
+    
+    function if_stat()
+        self.node_context = new nodes::if_stat (self.node_context, self.exp)
+        self.node_context.root = self.node_context
+        self.if_context = self.node_context
+    
+    function enter_else_if()
+        pass
+    
+    function else_if()
+        self.node_context.then_ = self.block_current
+        self.node_context.else_ = new nodes::if_stat (self.node_context.parent, self.exp)
+        self.node_context.else_.root = self.node_context.root
+        self.node_context = self.node_context.else_
+    
+    function else_clause()
+        self.node_context.then_ = self.block_current
+    
+    function close_if()
+        if self.node_context.then_ == null then
+            self.node_context.then_ = self.block_current
+        else
+            self.node_context.else_ = self.block_current
+        self.block << self.node_context.root
+        self.node_context = self.node_context.parent
+    
+    function close_else_if()
+        pass
+    
+    function enter_while()
+        pass
+    
+    function while_stat()
+        self.node_context = new nodes::while_stat (self.node_context, self.exp)
+    
+    function exit_while()
+        self.node_context.body = self.block_current
+        self.block << self.node_context
+        self.node_context = self.node_context.parent
+    
+    function push()
+        self.exp_base = self.exp_left
+        self.exp_left = self.exp
+    
+    function for_range(name)
+        self.node_context = new nodes::for_range (self.node_context, name, self.exp)
+    
+    function for_range_start(name)
+        self.node_context = new nodes::for_range_start (self.node_context, name, self.exp_left, self.exp)
+    
+    function for_each(name)
+        self.node_context = new nodes::for_each (self.node_context, name, self.exp)
+    
+    function end_for()
+        self.node_context.body = self.block_current
+        self.block << self.node_context
+        self.node_context = self.node_context.parent
+    
+    function break_stat()
+        self.block << new nodes::break_stat ()
+    
+    function continue_stat()
+        self.block << new nodes::continue_stat ()
+    
+    function return_stat()
+        self.block << new nodes::return_stat (self.exp)
+    
+    function append()
+        self.exit_assign()
+        self.block << new nodes::append (self.exp_left, self.exp)
+    
+    function enter_assign()
+        self.push()
+        self.call_stack << [self.exp_left, self.exp_base]
+    
+    function exit_assign()
+        var data = util::pop(self.call_stack)
+        self.exp_left = data[0]
+        self.exp_base = data[1]
+    
+    function exp_stat()
+        self.block << self.exp
+    
+    function enter_binop(op)
+        self.call_stack << self.exp_left
+        self.push()
+    
+    function exit_binop()
+        self.exp_left = util::pop(self.call_stack)
+    
+    function binary_op(op)
+        var type = binary_op_table[op]
+        self.exp = new type (self.exp_left, self.exp)
+        self.exit_binop()
+    
+    function unary_op(op)
+        var type = unary_op_table[op]
+        self.exp = new type (self.exp)
+    
+    function enter_call()
+        self.call_stack << [self.exp_left, self.call_args]
+        self.push()
+        self.call_args = [ ]
+    
+    function exit_call()
+        var frame = util::pop(self.call_stack)
+        self.exp_left = frame[0]
+        self.call_args = frame[1]
+    
+    function push_arg()
+        self.call_args << self.exp
+    
+    function function_call()
+        self.exp = new nodes::function_call (self.exp_left, self.call_args)
+        self.exit_call()
+    
+    function enter_index()
+        self.call_stack << self.exp_left
+        self.push()
+    
+    function exit_index()
+        self.exp_left = util::pop(self.call_stack)
+    
+    function get_index()
+        self.exp = new nodes::get_index (self.exp_left, self.exp)
+        self.exit_index()
+    
+    function insert()
+        self.exit_assign()
+        self.block << new nodes::insert (self.exp_base, self.exp_left, self.exp)
+        self.exit_index()
+    
+    function set_index(op)
+        self.exit_assign()
+        var augmented_op = augmented_op_table[op]
+        self.block << new nodes::set_index (self.exp_base, self.exp_left,
+            new augmented_op (new nodes::get_index (self.exp_base, self.exp_left), self.exp))
+        self.exit_index()
+    
+    function get_field(field)
+        self.exp = new nodes::get_field (self.exp, field)
+    
+    function method_call(name)
+        self.exp = new nodes::method_call (self.exp_left, name, self.call_args)
+        self.exit_call()
+    
+    function set_field(field, op)
+        self.exit_assign()
+        var augmented_op = augmented_op_table[op]
+        self.block << new nodes::set_field (self.exp_left, field,
+            new augmented_op (new nodes::get_field(self.exp_left, field), self.exp))
+    
+    function set_static(field, op)
+        self.exit_assign()
+        var augmented_op = augmented_op_table[op]
+        self.block << new nodes::set_static (self.exp_left, field,
+            new augmented_op (new nodes::get_static(self.exp_left, field), self.exp))
+    
+    function set_name(name, op)
+        self.exit_assign()
+        var augmented_op = augmented_op_table[op]
+        self.block << new nodes::set_name (name,
+            new augmented_op (new nodes::name_node (name),
+            self.exp))
+    
+    function enter_super_call()
+        pass
+    
+    function self_exp()
+        self.exp = new nodes::self_exp ()
+    
+    function super_call()
+        self.exp = new nodes::super_call(self.function_context, self.call_args)
+        self.exit_call()
+    
+    function sizeof_op()
+        self.exp = new nodes::sizeof_op (self.exp)
+    
+    function new_op()
+        self.exp = new nodes::new_op (self.exp_left, self.call_args)
+        self.exit_call()
+    
+    function instanceof_op()
+        self.exp = new nodes::instanceof_op (self.exp_left, self.exp)
+    
+    function enter_data_exp()
+        self.call_stack << [self.keys, self.values]
+    
+    function exit_data_exp()
+        var frame = util::pop(self.call_stack)
+        self.keys = frame[0]
+        self.values = frame[1]
+    
+    function enter_array_exp()
+        self.enter_data_exp()
+        self.values = [ ]
+    
+    function push_array_value()
+        self.values << self.exp
+    
+    function array_exp()
+        self.exp = new nodes::array_exp(self.values)
+        self.exit_data_exp()
+    
+    function enter_table_exp()
+        self.enter_data_exp()
+        self.keys = [ ]
+        self.values = [ ]
+    
+    function push_table_key()
+        self.keys << self.exp
+    
+    function push_table_value()
+        self.values << self.exp
+    
+    function push_table_null_value()
+        self.values << null
+    
+    function push_table_item()
+        pass
+    
+    function table_exp()
+        self.exp = new nodes::table_exp (self.keys, self.values)
+        self.exit_data_exp()
+    
+    function nested_exp()
+        self.exp = new nodes::nested_exp (self.exp)
+    
+    function null_exp()
+        self.exp = new nodes::null_exp ()
+    
+    function true_exp()
+        self.exp = new nodes::bool_exp (true)
+    
+    function false_exp()
+        self.exp = new nodes::bool_exp (false)
+    
+    function int_literal(value)
+        self.exp = new nodes::int_exp (string::stoi(value))
+    
+    function float_literal(value)
+        self.exp = new nodes::float_exp (string::stof(value))
+    
+    function char_literal(value)
+        if string::len(value) != 3 then
+            if value == "'\\0'" then
+                value = '\0'
+            else if value == "'\\r'" then
+                value = '\r'
+            else if value == "'\\n'" then
+                value = '\n'
+            else if value == "'\\t'" then
+                value = '\t'
+            else if value == "'\\\\'" then
+                value = '\\'
+            else if value == "'\\\"'" then
+                value = '"'
+            else if value == "'\\''" then
+                value = '\''
+            else
+                value = '\0'
+        else
+            value = string::index(value, 1)
+        self.exp = new nodes::char_exp (value)
+    
+    function string_literal(value)
+        self.exp = new nodes::str_exp (string::normal(value))

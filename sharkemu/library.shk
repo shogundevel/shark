@@ -1,0 +1,338 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of me software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and me permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+# import system libraries
+import system.error
+import system.exit
+import system.io
+import system.math
+import system.path
+import system.string
+import system.time
+import system.util
+
+# import runtime library
+import sharkemu.runtime
+
+# library data
+var library = { }
+
+# shortcuts
+var current_module = null
+var current_class = null
+
+function native(name, code)
+    var native_object = new runtime::native_function_object (name, code)
+    if current_class != null then
+        current_class.namespace[name] = native_object
+    else
+        current_module.namespace[name] = native_object
+
+function begin(name)
+    current_class = new runtime::class_object (name, null)
+    current_module.namespace[name] = current_class
+
+function end()
+    current_class = null
+
+function module(import_path)
+    current_module = new runtime::module_object (import_path)
+    library[import_path] = current_module
+
+# standard library wrappers
+
+module("system.error")
+
+current_module.namespace["ERR_NONE"] = error::ERR_NONE
+current_module.namespace["ERR_UNKNOWN"] = error::ERR_UNKNOWN
+
+native("get_err", error::get_err)
+native("has_err", error::has_err)
+native("set_err", error::set_err)
+native("clear_err", error::clear_err)
+native("error", error::error)
+
+function pcall(callee, args)
+    return error::pcall(callee.code, args)
+
+native("pcall", pcall)
+
+module("system.exit")
+
+current_module.namespace["FAILURE"] = exit::FAILURE
+current_module.namespace["SUCCESS"] = exit::SUCCESS
+
+native("exit", exit::exit)
+
+module("system.io")
+
+current_module.namespace["ERR_UNKNOWN"] = io::ERR_UNKNOWN
+current_module.namespace["ERR_FILE_NOT_FOUND"] = io::ERR_FILE_NOT_FOUND
+
+begin("text_file")
+
+var text_file = current_class
+
+function text_file_put(me, value)
+    return me.put(value)
+native("put", text_file_put)
+
+function text_file_puts(me, data)
+    return me.puts(data)
+native("puts", text_file_puts)
+
+function text_file_printf(me, data, args)
+    return me.printf(data, args)
+native("printf", text_file_printf)
+
+function text_file_fetch(me)
+    return me.fetch()
+native("fetch", text_file_fetch)
+
+function text_file_read(me, count)
+    return me.read(count)
+native("read", text_file_read)
+
+function text_file_at_end(me)
+    return me.at_end()
+native("at_end", text_file_at_end)
+
+function text_file_close(me)
+    return me.close()
+native("close", text_file_close)
+
+end()
+
+begin("binary_file")
+
+var binary_file = current_class
+
+function binary_file_put(me, value)
+    return me.put(value)
+native("put", binary_file_put)
+
+function binary_file_puts(me, data)
+    return me.puts(data)
+native("puts", binary_file_puts)
+
+function binary_file_fetch(me)
+    return me.fetch()
+native("fetch", binary_file_fetch)
+
+function binary_file_read(me, count)
+    return me.read(count)
+native("read", binary_file_read)
+
+function binary_file_at_end(me)
+    return me.at_end()
+native("at_end", binary_file_at_end)
+
+function binary_file_close(me)
+    return me.close()
+native("close", binary_file_close)
+
+end()
+
+function open(filename, mode)
+    var object = io::open(filename, mode)
+    if object == null then
+        return null
+    if mode == "r" or mode == "w" then
+        return new runtime::native_object (text_file, object)
+    else
+        return new runtime::native_object (binary_file, object)
+
+native("open", open)
+native("put", io::put)
+native("puts", io::puts)
+native("printf", io::printf)
+native("read_line", io::read_line)
+
+module("system.math")
+
+current_module.namespace["pi"] = math::pi
+current_module.namespace["e"] = math::e
+
+native("abs", math::abs)
+native("acos", math::acos)
+native("asin", math::asin)
+native("atan", math::atan)
+native("atan2", math::atan2)
+native("cos", math::cos)
+native("cosh", math::cosh)
+native("sin", math::sin)
+native("sinh", math::sinh)
+native("tan", math::tan)
+native("tanh", math::tanh)
+native("exp", math::exp)
+native("log", math::log)
+native("log10", math::log10)
+native("pow", math::pow)
+native("sqrt", math::sqrt)
+native("ceil", math::ceil)
+native("floor", math::floor)
+native("min", math::min)
+native("max", math::max)
+native("random", math::random)
+
+module("system.path")
+
+native("get_base", path::get_base)
+native("get_tail", path::get_tail)
+native("get_ext", path::get_ext)
+native("remove_ext", path::remove_ext)
+native("join", path::join)
+native("listdir", path::listdir)
+native("mkdir", path::mkdir)
+native("rmdir", path::rmdir)
+native("unlink", path::unlink)
+
+module("system.string")
+
+current_module.namespace["ERR_INVALID_LITERAL"] = string::ERR_INVALID_LITERAL
+current_module.namespace["CHAR_SIZE"] = string::CHAR_SIZE
+
+native("itos", string::itos)
+native("ftos", string::ftos)
+native("ctos", string::ctos)
+native("stoi", string::stoi)
+native("stof", string::stof)
+native("islower", string::islower)
+native("isupper", string::isupper)
+native("isalpha", string::isalpha)
+native("isdigit", string::isdigit)
+native("isalnum", string::isalnum)
+native("isident", string::isident)
+native("ishex", string::ishex)
+native("isascii", string::isascii)
+native("issurrogate", string::issurrogate)
+native("tolower", string::tolower)
+native("toupper", string::toupper)
+native("len", string::len)
+native("index", string::index)
+native("slice", string::slice)
+native("find", string::find)
+native("concat", string::concat)
+native("join", string::join)
+native("split", string::split)
+native("format", string::format)
+native("normal", string::normal)
+native("quote", string::quote)
+
+begin("strbuf")
+
+function strbuf_new()
+    return new string::strbuf ()
+current_class.create = new runtime::native_function_object ("new", strbuf_new)
+
+function strbuf_init(me)
+    return me.init()
+native("init", strbuf_init)
+
+function strbuf_put(me, value)
+    return me.put(value)
+native("put", strbuf_put)
+
+function strbuf_puts(me, data)
+    return me.puts(data)
+native("puts", strbuf_puts)
+
+function strbuf_printf(me, data, args)
+    return me.printf(data, args)
+native("printf", strbuf_printf)
+
+function strbuf_read_all(me)
+    return me.read_all()
+native("read_all", strbuf_read_all)
+
+end()
+
+begin("bytes")
+
+function bytes_new()
+    return new string::bytes ()
+current_class.create = new runtime::native_function_object ("new", bytes_new)
+
+function bytes_init(me)
+    return me.init()
+native("init", bytes_init)
+
+function bytes_put(me, value)
+    return me.put(value)
+native("put", bytes_put)
+
+function bytes_put_short(me, value)
+    return me.put_short(value)
+native("put_short", bytes_put_short)
+
+function bytes_put_int(me, value)
+    return me.put_int(value)
+native("put_int", bytes_put_int)
+
+function bytes_puts(me, value)
+    return me.puts(value)
+native("puts", bytes_puts)
+
+function bytes_tell(me)
+    return me.tell()
+native("tell", bytes_tell)
+
+function bytes_patch(me, pos, value)
+    return me.patch()
+native("patch", bytes_patch)
+
+function bytes_patch_short(me, pos, value)
+    return me.patch_short()
+native("patch_short", bytes_patch_short)
+
+function bytes_patch_int(me, pos, value)
+    return me.patch_int()
+native("patch_int", bytes_patch_int)
+
+function bytes_get(me, index)
+    return me.get()
+native("get", bytes_get)
+
+end()
+
+native("encode", string::encode)
+native("decode", string::decode)
+
+module("system.time")
+
+native("clock", time::clock)
+
+module("system.util")
+
+native("copy", util::copy)
+native("slice", util::slice)
+native("pop", util::pop)
+native("popindex", util::popindex)
+native("find", util::find)
+native("concat", util::concat)
+native("extend", util::extend)
+native("remove", util::remove)
+native("update", util::update)

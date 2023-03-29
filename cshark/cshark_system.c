@@ -745,6 +745,7 @@ SHARK_NATIVE(normal)
     normal->data = shark_realloc(normal->data, final_size + 1);
     normal->data[final_size] = '\0';
     normal->size = final_size;
+    shark_string_init(normal);
     return SHARK_FROM_PTR(normal);
 }
 
@@ -1138,6 +1139,8 @@ end:
     size = step * 256 + index;
     line->data[size] = '\0';
     line->data = shark_realloc(line->data, size + 1);
+    line->size = size;
+    shark_string_init(line);
     return line;
 }
 
