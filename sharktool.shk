@@ -36,6 +36,8 @@ import sharkenv
 import sharkmake
 import sharkzip
 
+import sharkenv.builtin: install, clone
+
 function main(args)
     if sizeof(args) < 2 then
         printf("usage: % <command> <args>\n", [args[0]])
@@ -44,11 +46,11 @@ function main(args)
         puts("\trun <filename> <args>\n")
         puts("\tcompile <target> <filename> <out>\n")
         puts("\tlink <target> <source> <main> <out> <libs>\n")
-        puts("\tmake [action]\n")
         puts("\tbuild <filename> <out> <libs>\n")
+        puts("\tmake [action]\n")
         puts("\tzip <source> <target>\n")
-        puts("\tinstall <libs>\n")
-        puts("\tuninstall <libs>\n")
+        puts("\tinstall <filename>\n")
+        puts("\tclone <source> <target>\n")
         puts("(no command specified, now entering sharkenv)\n")
         sharkenv::main([args[0]])
         return
@@ -70,6 +72,15 @@ function main(args)
     else if command == "make" then
         args[0] << format("% %", [filename, command])
         sharkmake::main(args)
+    else if command == "zip" then
+        args[0] << format("% %", [filename, command])
+        sharkzip::main(args)
+    else if command == "install" then
+        args[0] << format("% %", [filename, command])
+        install(args)
+    else if command == "clone" then
+        args[0] << format("% %", [filename, command])
+        clone(args)
     else if command == "build" then
         if sizeof(args) < 2 then
             printf("usage: % build <filename> <out> <libs>\n", [filename])
@@ -84,24 +95,5 @@ function main(args)
         extend(link_args, libs)
         sharklink::main(link_args)
         unlink(bin)
-    else if command == "zip" then
-        args[0] << format("% %", [filename, command])
-        sharkzip::main(args)
-    else if command == "install" then
-        for lib in args do
-            if get_ext(lib) != ".shar" then
-                printf("can't install invalid library file '%', expected a shark archive (.shar).\n", [lib])
-            else
-                var source = sharklink::fopen(lib, "rb")
-                var target = sharklink::fopen(join(base, get_tail(lib)), "wb")
-                sharklink::fread(source, target)
-                target.close()
-    else if command == "uninstall" then
-        for lib in args do
-            if get_ext(lib) != ".shar" then
-                printf("can't uninstall invalid library file '%', expected a shark archive (.shar).\n", [lib])
-            else
-                if not unlink(join(base, lib)) then
-                    printf("unknown library file '%'.\n", [lib])
     else
         printf("unknown command '%'.", [command])

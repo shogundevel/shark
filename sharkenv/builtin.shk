@@ -24,7 +24,7 @@
 ## 
 ################################################################################
 
-import system.io: puts, printf
+import system.io: puts, printf, open
 import system.exit -> libexit
 import system.path
 import system.string
@@ -53,3 +53,37 @@ function exit(args)
 
 function echo(args)
     printf("%\n", [string::join(" ", util::slice(args, 1, sizeof(args)))])
+
+function install(args)
+    if sizeof(args) != 2 then
+        puts("usage: install <filename>\n\tinstalls a file locally, so it can be cloned later.")
+        return
+    var base = path::get_base(args[0])
+    var origin = args[1]
+    var source = open(origin, "rb")
+    if source == null then
+        printf("can't open input file '%'.", [origin])
+        return
+    var libs = path::join(base, "libs")
+    path::mkdir(libs)
+    var install_path = path::join(libs, path::get_tail(origin))
+    var output = open(install_path, "wb")
+    while not source.at_end() do
+        output.puts(source.read(256))
+
+function clone(args)
+    if sizeof(args) != 3 then
+        puts("usage: clone <source> <target>\n\tclones a file from the local repository.")
+        return
+    var base = path::get_base(args[0])
+    var origin = path::join(path::join(base, "libs"), args[1])
+    var target = args[2]
+    var source = open(origin, "rb")
+    if source == null then
+        printf("in clone operation: can't open requested file '%'.", [origin])
+        return
+    var output = open(target, "wb")
+    if output == null then
+        printf("in clone operation: can't reach <target> file '%', operation aborted.", [target])
+    while not source.at_end() do
+        output.puts(source.read(256))

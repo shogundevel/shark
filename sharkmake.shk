@@ -29,6 +29,22 @@ import system.string
 
 import sharkenv.core
 
+import sharkc
+import sharklink
+import sharkemu
+import sharkmake
+import sharkzip
+
+function play(args)
+    sharkemu::play()
+
+core::command_table["compile"] = sharkc::main
+core::command_table["link"] = sharklink::main
+core::command_table["run"] = sharkemu::main
+core::command_table["play"] = play
+core::command_table["make"] = sharkmake::main
+core::command_table["zip"] = sharkzip::main
+
 function main(args)
     core::exec_name = args[0]
     var source = open("make", "r")
