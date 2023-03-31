@@ -54,12 +54,16 @@ Also, the booting time for a program is bigger because sharkemu haves to compile
 ## Compiling And Linking
 
 Let's say you want to compile a file called hello.shk (stored elsewhere on the filesystem). First cd to the directory containing the file then type the following:
+
 > shark tool compile c hello.shk hello.obj
+
 The first three words 'shark tool compile' are used to call the shark compiler. The next, 'c' tells the compiler to generate C bytecode. The next is the path to the source code you want to compile and the last is the path where the object code will be stored.
 This command should generate an object file called 'hello.obj'.
 
 To link your newly created object file into a shark executable type the following:
+
 > shark tool link c hello.obj hello hello.shar
+
 The first three words 'shark tool link' calls the shark linker. The next, 'c' tells the linker that we're generating a C bytecode executable. The next is the path to the object file to be linked 'hello.obj'. Next is the name of the module that will be run on program start and that contains the 'main' function 'hello' and last is the name of the output shark executable 'hello.shar'. The '.shar' file extension means "SHark ARchive" and is used by shark C bytecode executables and library files.
 
 If you followed all the steps just type 'shark hello.shar' to execute the produced shark executable.
@@ -69,6 +73,7 @@ Try tipying 'shark tool compile' and 'shark tool link' without arguments to see 
 ## One-Step Building
 
 A shortcut to generate a shark archive directly from a shark source file is 'shark tool build'. You could have typed the following to create the final executable:
+
 > shark tool build hello.shk hello.shar
 
 This is munch shortest and easier to use, but is only available for the C bytecode target.
