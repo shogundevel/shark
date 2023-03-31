@@ -97,7 +97,7 @@ The following commands are provided by the shark SDK:
 * exit
 
 The 'echo' command echoes the rest of the line to console output.
-The 'play' command enters sharkenv in eval mode.
+The 'play' command enters sharkemu in eval mode.
 
 Run the other commands without arguments to learn more about each one.
 
@@ -120,73 +120,99 @@ You can request sharkmake to run one or more particular tags of a make file by p
 ## Gameshark Howto
 
 To compile and run a gameshark project cd to the project's root directory and type the following commands:
+
 > shark tool build src/main.shk bin/game.shar
+
 > gameshark ./
+
 The first command builds the game binary and the second executes it.
 
 ## Python Howto
 
 To start cross compiling to python change the 'c' argument of the compiler to 'py'. For instance to compile our 'hello.shk' to python do:
+
 > shark tool compile py hello.shk out.py
 
 Now the result must be linked against the shark runtime (sharkrt.py located in the /rt directory of the shark SDK) to run properly. There are two ways to do this.
+
 You can link the result dynamically against sharkrt.py by tipying:
+
 > shark tool link py out.py hello hello.py
+
 The resulting python file depends on 'sharkrt.py' to run so make sure the file is available to python in some way.
+
 Second, you can link statically, which will embed the shark runtime into the final executable and make it dependency free. For this use the 'pyo' target of the linker:
+
 > shark tool link pyo out.py hello hello.py
 
 Whatever method you choose run the generated 'hello.py' with:
+
 > python hello.py
 
 When compiling to python you can directly import any python library from shark using the 'import' declaration, like if it where a regular shark module.
 
 But this may not be enought for writting portable code. If you want to use the shark standard library from python you must compile it from source and link it against your python executable.
 
-To compile the shark standard library from source cd to the shark SDK root directory and type the following command:
-> shark tool compile py lib/libpythonsystem/system.shk out/system.py
+To compile the shark standard library from source cd to the shark SDK root directory and type the following command:> shark tool compile py lib/libpythonsystem/system.shk out/system.py
 
 To link your program against the system library copy the generated out/system.py to the desired location then run the following:
+
 > shark tool link py my-python-object.py main my-python-program.py system.py
 
 To run a GS based game in python you will need to install the pygame library, compile the pygameshark library from source and link it 'correctly' against your game code.
 
 First install pygame:
+
 > pip install pygame
 
 Next cd to the shark SDK root directory and type...
+
 > shark tool compile py lib/libpythonsystem/system.shk out/system.py
+
 ...to build the system library and...
+
 > shark tool compile py lib/libpygameshark/shark.shk out/shark.py
+
 ...to build the gameshark library.
 
 Now cd to your game's root directory and type:
+
 > shark tool compile py src/main.shk bin/out.py
+
 Now link the created libraries to your game code passing 'shark' (and not 'main') as the main module, like this:
+
 > shark tool link pyo bin/out.py shark bin/game.py path/to/system.py path/to/shark.py
 
 ## JavaScript Howto
 
 To start cross compiling to javascript change the 'c' argument of the compiler to 'js'. For instance to compile our 'hello.shk' to javascript do:
+
 > shark tool compile js hello.shk out.js
 
 Now the result must be linked against the shark runtime (sharkrt.js located in the /rt directory of the shark SDK) to run properly. There are two ways to do this.
 If you're creating a web page you can use a script tag to make the required 'sharkrt.js' available to your program. This requires no linking.
 Otherwise you can link to it statically, which will embed the shark runtime into the final executable. For this use the 'js' target of the linker:
+
 > shark tool link js out.js hello hello.js
 
 When compiling to javascript you can make any global javascript variable visible from shark by declaring it in your source file as an empty variable. For instance, to access the browser's console object you can write:
+
 var console
+
 console::log("Hi.")
 
 To run a GS based game in HTML5 you will need to compile the htmlgameshark library from source and link it 'correctly' against your game code.
 
 First cd to the shark SDK root directory and type the following to build the gameshark library:
+
 > shark tool compile js lib/libhtmlgameshark/shark.shk out/shark.js
 
 Now cd to your game's root directory and type:
+
 > shark tool compile js src/main.shk bin/out.js
+
 Now link the created library to your game code passing 'shark' (and not 'main') as the main module and naming the result 'game.js', like this:
+
 > shark tool link js bin/out.js shark bin/game.js path/to/shark.js
 
 Last, copy the file 'template/index.html' from the shark SDK directory into your game's root directory. Launch the result in a browser to test it.
@@ -194,28 +220,37 @@ Last, copy the file 'template/index.html' from the shark SDK directory into your
 ## Lua Howto
 
 To start cross compiling to lua change the 'c' argument of the compiler to 'lua'. For instance to compile our 'hello.shk' to lua do:
+
 > shark tool compile lua hello.shk out.lua
 
 Now the result must be linked against the shark runtime (sharkrt.lua located in the /rt directory of the shark SDK) to run properly. There are two ways to do this.
 You can link the result dynamically against sharkrt.lua by tipying:
+
 > shark tool link lua out.lua hello hello.lua
+
 The resulting lua file depends on 'sharkrt.lua' to run so make sure the file is available to lua in some way.
 Second, you can link statically, which will embed the shark runtime into the final executable and make it dependency free. For this use the 'luao' target of the linker:
+
 > shark tool link luao out.lua hello hello.lua
 
 Whatever method you choose run the generated 'hello.lua' with:
+
 > lua hello.lua
 
 When compiling to lua you can directly import any lua library from shark using the 'import' declaration, like if it where a regular shark module. You can also make any global lua variable visible from shark by declaring it in your source file as an empty variable. For instance, to access lua's print function you can write:
+
 var print
+
 print("Hi.")
 
 But this may not be enought for writting portable code. If you want to use the shark standard library from lua you must compile it from source and link it against your lua executable.
 
 To compile the shark standard library from source cd to the shark SDK root directory and type the following command:
+
 > shark tool compile lua lib/libluasystem/system.shk out/system.lua
 
 To link your program against the system library copy the generated out/system.lua to the desired location then run the following:
+
 > shark tool link lua my-lua-object.lua main my-lua-program.lua system.lua
 
 ## Ren'Py Howto
@@ -223,11 +258,15 @@ To link your program against the system library copy the generated out/system.lu
 To port a GS game to Ren'Py start by launching renpy and creating a new empty project, then replace the generated 'game/script.rpy' with the file 'template/script.rpy' found in the shark SDK directory.
 
 Next compile the shark system library and the 'renpygameshark' library using the 'rpy' target of the compiler:
+
 > shark tool compile rpy lib/libpythonsystem/system.shk out/system.rpy
+
 > shark tool compile rpy lib/librenpygameshark/shark.shk out/shark.rpy
+
 Copy those files to your game's directory and you've got a basic renpy environment to run your game code.
 
 Now, to compile your game to renpy source code cd to your game's root directory and type:
+
 > shark tool compile rpy src/main.shk bin/game.rpy
 
 Now copy the generated bin/game.rpy along with your game's /asset folder to your renpy game's directoy, and that's it. Launch your game to test it.
