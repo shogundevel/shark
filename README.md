@@ -1,4 +1,4 @@
-# Shark Programming Language
+# The Shark Programming Language
 
 Welcome to the Shark programming language! Shark is a language designed to provide the speed and size of Lua, while also offering the familiar syntax of Python and the ability to run in the browser.
 
