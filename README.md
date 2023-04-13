@@ -1,8 +1,14 @@
-# The Shark Programming Language
+# The Shark Programming Language, Version 1
 
 Welcome to the Shark programming language! Shark is a language designed to provide the speed and size of Lua, while also offering the familiar syntax of Python and the ability to run in the browser.
 
 Overall, Shark is a very versatile language that can be used to build web/desktop/mobile applications and games with a single codebase, command line tools and anything you can imagine using pre existing libraries and systems available to python, lua, javascript, java and native code. This includes embedding the tiny shark VM in any java or native project with ease.
+
+This is version 1 of the language, a version 2 with many improvements is in progress!
+
+The version 2 of the language will be statically typed, and initial benchmarks shows it is 12 times **faster** and consumes 87.2 **less memory** than version 1. It also is a munch smaller codebase, consequently having munch less bugs.
+
+Unafortunately, versions 1 and 2 are not compatible and **support for shark 1 is going to be dropped in 6 months after version 2 is released**.
 
 ## Features
 
