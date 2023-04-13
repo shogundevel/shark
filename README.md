@@ -6,9 +6,9 @@ Overall, Shark is a very versatile language that can be used to build web/deskto
 
 This is version 1 of the language, a version 2 with many improvements is in progress!
 
-The version 2 of the language will be statically typed, and initial benchmarks shows it is 12 times **faster** and consumes 87.2 **less memory** than version 1. It also is a munch smaller codebase, consequently having munch less bugs.
+The version 2 of the language will be statically typed, and initial benchmarks shows it is 12 times **faster** and consumes munch (around 1/3) **less memory** than version 1. It also is a munch smaller codebase, consequently having munch less bugs.
 
-Unafortunately, versions 1 and 2 are not compatible and **support for shark 1 is going to be dropped in 6 months after version 2 is released**.
+Unafortunately, versions 1 and 2 are not source compatible and **support for shark 1 is going to be dropped in 6 months after version 2 is released**.
 
 ## Features
 
