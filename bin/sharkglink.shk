@@ -1,0 +1,87 @@
+function __shark_array_new(size)
+    var data = [ ]
+    for _ in range(size) do
+        data << null
+    return data
+function main(args)
+    if sizeof(args)<4 then
+        write("usage: ")
+        write(args[0])
+        write(" <target> <source> <out> <libs>\n")
+        write("\tLinks the given <filename> agains <libs> and places the result at <out>.\n")
+        write("\tTarget can be any of <py | js | lua | java | shk>\n")
+    else
+        var target = args[1]
+        var filename = args[2]
+        var source = open(filename, 'r')
+        if source==null then
+            write("can't open <source> for reading.")
+            exit(EXIT_FAILURE)
+        var out = open(args[3], 'w')
+        if out==null then
+            write("can't open <out> for writing.")
+            exit(EXIT_FAILURE)
+        else if target=="lua" then
+            out.write("require('sharkrt')\n")
+        else if target=="py" then
+            out.write("main = None\n")
+        else if target=="java" then
+            var buf = new strbuf()
+            var i = 4
+            while i<sizeof(args) do
+                buf.write(args[i])
+                buf.write(".import")
+                var lib = open(buf.get(), 'r')
+                if lib==null then
+                    continue
+                while not lib.at_end() do
+                    out.put(lib.fetch())
+                lib.close()
+                i+=1
+            out.write("public class Main {\n")
+        else if target=="shk" then
+            var buf = new strbuf()
+            var i = 4
+            while i<sizeof(args) do
+                buf.write(args[i])
+                buf.write(".import")
+                var lib = open(buf.get(), 'r')
+                if lib==null then
+                    continue
+                while not lib.at_end() do
+                    out.put(lib.fetch())
+                lib.close()
+                i+=1
+        var i = 4
+        while i<sizeof(args) do
+            var lib = open(args[i], 'r')
+            if lib==null then
+                write("can't open lib '")
+                write(args[i])
+                write(" for reading.")
+            while not lib.at_end() do
+                out.put(lib.fetch())
+            lib.close()
+            i+=1
+        while not source.at_end() do
+            out.put(source.fetch())
+        source.close()
+        if target=="js" then
+            out.write("main ? main(process ? process.argv.slice(1, process.argv.length) : [ \"\" ]) : null;")
+            out.close()
+        else if target=="lua" then
+            out.write("arg[#arg + 1] = ''\nif main ~= nil then main(arg) end\n")
+            out.close()
+        else if target=="py" then
+            out.write("import sys\nif main: main(sys.argv)\n")
+            out.close()
+        else if target=="java" then
+            out.write("}")
+            out.close()
+        else if target=="shk" then
+            out.close()
+        else
+            write("WARNING: can't recognize desired target '")
+            write(target)
+            write("'")
+            out.close()

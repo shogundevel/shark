@@ -1,11 +1,18 @@
-# Shark Programming Language
+# The Shark SDK
 
-Welcome to the Shark programming language! Shark is a language designed to provide the speed and size of Lua, while also offering the familiar syntax of Python and the ability to run in the browser.
+Welcome to the Shark SDK!
 
-Overall, Shark is a very versatile language that can be used to build web/desktop/mobile applications and games with a single codebase, command line tools and anything you can imagine using pre existing libraries and systems available to python, lua, javascript, java and native code. This includes embedding the tiny shark VM in any java or native project with ease.
+This SDK is the home of the Shark (dynamic) and SharkG (static) programming languages reference implementations.
 
-## Features
+The seal of identity of the SDK is the inmense portability and library compatibility of the programs it consumes and produces, being posible to integrate both languages with C/C++, Java, Python, JavaScript and Lua in the development of a wide array of applications.
 
+The kit includes two compilers (sharkc and sharkg), three interpreters (cshark, jshark and sharkemu), a command line interface (sharkenv), a makefile interpreter (sharkmake), the implementations (in many environments) of two standardized common function libraries and the implementation (also in many environments) of a standardized 2D game library.
+
+# The Shark Programming Language
+
+Shark is a dynamic language designed to provide the speed and size of Lua, while also offering the familiar syntax of Python and the ability to run in the browser.
+
+Some key features:
 * **Fast and lightweight** native virtual machine written in C
 * Small package size (50 KB) with minimal dependencies
 * Can be used in **the browser** and compiled to portable ECMAScript code
@@ -25,9 +32,73 @@ function main(args)
         printf("Hello, %!", [name])
 ```
 
+# The SharkG Programming Language
+
+If you like C, Lua or Python you will be inmediately into SharkG.
+
+SharkG is a borderline minimalistic, very portable and multi-proupose programming language.
+
+Here are some key features:
+* Portable: The reference SharkG compiler can output C, Java, Python, Lua, JavaScript and Shark code.
+* Statically Typed: Typing is static, strong and minimal. The type system can be used to write type safe code in platforms where typing is blurry or directly non-existent.
+* Pythonic: Indentation and keyword based syntax. Very straighforward semantics.
+* Efficent: Compile directly to C to achieve excellent speed and very low memory footprints.
+* Excellent Library Support: Write typed declarations to access any API available to C/C++, Java, Python, Lua or JavaScript code.
+* Low Level Access: Write device drivers, embedded systems or operating systems by inlining C and Assembly code directly.
+
+## Example Program
+
+Here is a simple hello world:
+
+```[lua]
+
+import "system/io.api"
+
+function main(args: [] str)
+    write("Hello, world!")
+
+```
+
+Here is a simple tool that computes the Nth fibonacci number:
+
+```[lua]
+
+import "system/io.api"
+import "system/string.api"
+
+function fib(x: int) -> int
+    if x < 2 then
+        return x
+    else
+        return fib(x - 1) + fib(x - 2)
+
+function main(args: [] str)
+    if sizeof(args) != 2 then
+        write("Usage: fib n\n")
+        write("\tComputes the nth fibonacci sequence number.")
+        return
+    write(itos(fib(stoi(args[1]))))
+
+```
+
+Here is an example that uses C's printf:
+
+```[lua]
+
+inline "#include <stdio.h>"
+
+function main(args: [] str)
+    if sizeof(args) == 1 then
+        inline "printf(\"usage: %s <name1> <name2> ... <nameN>\\n\", args[0]->data);"
+    else
+        for i: int = 0, i < sizeof(args), i++ do
+            inline "printf(\"Hello, %s!\\n\", ((shark_str) args->data[i])->data);"
+
+```
+
 ## Getting Started
 
-To get started with Shark, read the Shark Handbook in this repo to learn the basics of Shark programming.
+To get started with Shark and SharkG read The Shark Handbook in this repository.
 
 ## Installing And Using The Shark SDK
 
@@ -51,7 +122,7 @@ To run sharkemu on a file just type:
 However, notice that sharkemu is an emulator written in shark, what makes it munch slower and more memory and CPU consuming than compiled code.
 Also, the booting time for a program is bigger because sharkemu haves to compile the full source code of an application before running it.
 
-## Compiling And Linking
+## Compiling And Linking Shark Code
 
 Let's say you want to compile a file called hello.shk (stored elsewhere on the filesystem). First cd to the directory containing the file then type the following:
 > shark tool compile c hello.shk hello.obj
@@ -74,6 +145,45 @@ A shortcut to generate a shark archive directly from a shark source file is 'sha
 This is munch shortest and easier to use, but is only available for the C bytecode target.
 
 Also try tipying 'shark tool build' without arguments to learn more about this tool.
+
+## Compiling And Linking SharkG Code
+
+To show you how compiling, linking to libraries and executing a SharkG codebase works I'm going to build and run the compiler itself in all supported platforms.
+
+The 'sharkg' and 'sharkglink' commands here can be replaced with 'java -jar bin/sharkc.jar _' (notice the underscore) and 'java -jar bin/sharklink.jar _', gcc can be replaced with any standard C99 compiler (incluiding Bellard's Tiny C).
+
+First run 'sharkg' and 'sharkglink' without arguments to see their syntax.
+
+To build the compiler as a native executable use the following:
+
+> sharkg c sharkg.shg out.c include
+> gcc out.c lib/shark.c lib/shark_system.c lib/shark_main.c -Ilib -o test
+> test
+
+To build as a java executable use:
+
+> sharkg java sharkg.shg out.java include
+> sharkglink out.java Main.java lib/sharkgsystem.java
+> mkdir classes
+> javac -d classes Main.java
+> java -cp classes Main
+
+The final file (passed to the java compiler) must be named Main.java and live under no package (root).
+
+To build as a python program use:
+
+> sharkg py sharkg.shg out.py include
+> sharkglink out.py sharkg.py lib/sharkgsystem.py
+> python sharkg.py
+
+To build as a lua program use:
+
+> sharkg lua sharkg.shg out.lua include
+> sharkglink out.lua sharkg.lua lib/sharkgsystem.lua
+
+Lua programs depends in 'lib/sharkgrt.lua' so copy it to the same folder as your program. Then run:
+
+> lua sharkg.lua
 
 ## Using sharkenv And sharkmake
 
@@ -117,7 +227,7 @@ To run sharkmake cd to the directory containing the make file and type '> shark 
 
 You can request sharkmake to run one or more particular tags of a make file by passing their names as arguments. If no tag is specified the whole make file is executed from start to end.
 
-## Gameshark Howto
+## Gameshark Howto (Shark)
 
 To compile and run a gameshark project cd to the project's root directory and type the following commands:
 > shark tool build src/main.shk bin/game.shar
@@ -232,9 +342,92 @@ Now, to compile your game to renpy source code cd to your game's root directory 
 
 Now copy the generated bin/game.rpy along with your game's /asset folder to your renpy game's directoy, and that's it. Launch your game to test it.
 
+## Gameshark Howto (SharkG)
+
+Building a game using the sharkgame library is not hard. All games should have an /asset directory to store images and fonts, the game executable is usually finding that directory by assuming it's placed in the same directory where it got called.
+
+You can build a game for HTML5 using:
+
+> sharkg js demo/tetris/src/main.shg out.js
+> sharkglink js out.js demo/tetris/game.js lib/sharkgsystem.js lib/sharkgame.js
+
+The game code must be stored in the file 'game.js' so the template html file can find it (you can use any name really, and custom html files).
+Copy the file 'lib/index.html' to 'demo/tetris/index.html' and launch the result in a browser.
+
+Building for java goes:
+
+> sharkg java demo/rotozoomer/main.shg out.java
+> sharkglink java out.java Main.java lib/sharkgsystem.java lib/sharkgame.java
+
+Now build a .jar using a standard java compiler and place it alongside the /asset directory and you have a working java game.
+
+Building native games (requires SDL2 and SDL2_ttf installed):
+
+> sharkg c demo/tetris/src/main.shg out.c
+> gcc out.c lib/shark.c lib/shark_system.c lib/shark_game.c -Ilib -o demo/tetris/tetris -lSDL2 -lSDL2_ttf
+
+## Implementation Details
+
+* The CShark VM uses reference counting to manage memory and does not collect cyclic references. Likewise the C runtime of SharkG has no garbage collector, but you can (in both cases) plug-in Bohem's GC by implementing shark_allocate, shark_realloc and shark_delloc/shark_free. However, be warned that having a garbage collector does not frees you from doing manual memory management when using code not implemented by the shark runtime itself.
+* The SharkG compiler itself does not free any memory it uses under C, but consumes so little memory its not even worth the pain. If you have problems using it use the supplied Java binaries.
+* Compilation of SharkG code (except in python) is so fast you can use SharkG as a scripting language. Its not hard to call the sharkg compiler in chain with any C compiler or Lua runtime to run your code directly from source.
+* Using any python, javascript, lua or shark library from sharkg only requires thin API declarations. Any dynamic data type can be expressed from the shark type system using classes, and any special syntax not covered by shark itself can be injected using inline statements. Dependency injection is an easy way of linking a library without using the linker.
+
+This example declares some python APIs:
+
+```[javascript]
+
+# dependency injection
+inline "from os.path import join, split"
+
+# declares imported global functions
+function join(x: str, y: str) -> str
+function split(x: str) -> [] str
+
+# declares an abstract type that represents a python file
+class python_file (object)
+    function print(message: str)
+    function close()
+
+function open(filename: str, mode: char) -> python_file
+
+function main(args: [] str)
+    var base: str = split(args[0])[0]
+    var file: python_file = open(join(base, "out.txt"), 'w')
+    file.print("Hello, world!")
+    file.close()
+
+```
+
+* Using any C library from SharkG usually requires wrapping API calls in the SharkG ABI, unless you use the following trick with the inline statement:
+
+```[lua]
+
+# dependency injection
+inline "#include <stdio.h>"
+
+# forces the C compiler into expanding any call to 'printf'
+inline "#define shark_lib_printf(x, y)      printf(x->data, y->data)"
+
+# this must be defined to call printf from shark
+# but its never going to be called, because 'printf' is going to expand as a macro
+function printf(x: str, y: str)
+    null
+
+function main(args: [] str)
+    printf("Hello from '%s'!", args[0])
+
+```
+
+* The standard library (of both Shark and SharkG) is not fully implemented in JavaScript due to it having no standard I/O, thus this is the only platform that can't bootstrap the shark compilers out of the box. This does not means the shark compilers can't run in javascript, it is possible to use the compilers even in the browser by implementing a fake I/O stream using strings.
+* None of the system/path.api functions is implemented in lua due to it having (almost) no filesystem API. The only API calls that can be implemented without using third parties are rmdir and unlink.
+* The ctoi and itoc functions of the SharkG standard library are not implemented in python, where converting a character to its unicode code point is so painfully slow it renders any algorithm unusable.
+* Bitwise operators (~ | & ^ << >>) are not implemented in lua. Using them will not show a compilation error, but a runtime error when running the resulting lua code.
+* The array types in SharkG are provided for simple use cases. Nested arrays (matrixes) are not a standard feature of the language (very experimental/unstable) and should not be used in portable code. The SharkG standard library does not provides array slicing or copying functions. As a result, intensive array/matrix compute should not be implemented directly in SharkG.
+
 ## Next Steps
 
-Now you know basically everything needed to make full use of shark. If you need further help with Shark or want to start contributing, file an issue here on GH with your questions or suggestions.
+Now you know basically everything needed to make full use of shark. If you need further help or want to start contributing, file an issue here on GH with your questions or suggestions.
 
 Cheers, <br>
 \- ShogunDevel

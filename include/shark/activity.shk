@@ -30,5 +30,7 @@ class activity
     function draw_text(text, font, x, y)
     function launch()
     function event(type, x, y)
+    function text_event(text)
+    function cancel_event()
     function update()
     function render()

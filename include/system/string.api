@@ -1,0 +1,113 @@
+###############################################################################
+### Copyright #################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+###############################################################################
+
+import "system/error.api"
+
+# error code for an invalid literal
+var ERR_INVALID_LITERAL: int
+
+# parses a string containing an integer
+# returns 0 and sets global error to ERR_INVALID_LITERAL on failure
+function stoi(x: str) -> int
+
+# parses a string containing a real number
+# returns 0.0 and sets global error to ERR_INVALID_LITERAL on failure
+function stof(x: str) -> float
+
+# returns the text representation of the given integer
+function itos(x: int) -> str
+
+# returns the text representation of the given float
+function ftos(x: float) -> str
+
+# returns the numeric code of the given character
+function ctoi(x: char) -> int
+
+# returns the character value of the given numeric code
+function itoc(x: int) -> char
+
+# ASCII character classifying and conversion functions, behavior is the expected
+function islower(x: char) -> bool
+function isupper(x: char) -> bool
+function tolower(x: char) -> char
+function toupper(x: char) -> char
+
+function isalpha(x: char) -> bool
+function isdigit(x: char) -> bool
+function isalnum(x: char) -> bool
+function isident(x: char) -> bool
+
+# a string buffer to be filled with data
+class strbuf (object)
+    # create with 'var buf: strbuf = new strbuf ()'
+    function strbuf()
+    
+    # puts 'value' into this buffer
+    function put(value: char)
+    
+    # writes 'data' into this buffer
+    function write(data: str)
+    
+    # reads the whole buffer and returns the resulting string
+    # buffer gets cleared after this operation, so the strbuf can be reused
+    function get() -> str
+
+# iterates a string character by character
+class striter (object)
+    # create with 'var iter: striter = new striter (data)'
+    function striter(data: str)
+    
+    # gets the position/offset into the string
+    # the returning value is meaningless and should not be used other than to call 'striter.seek'
+    function tell() -> int
+    
+    # seeks (jumps to) the given 'pos'
+    # 'pos' should be something returned by 'striter.tell', behavior is undefined otherwise
+    function seek(pos: int)
+    
+    # gets the current character and advances one position
+    function next() -> char
+    
+    # returns true if this iterator is empty (no more data to be read)
+    function empty() -> bool
+
+# a map of strings to integers
+class strmap (object)
+    #createe with 'var map: strmap = new strmap ()'
+    function strmap()
+    
+    # gets the value mapped to 'index'
+    # behavior is undefined is 'index' is not mapped
+    function get(index: str) -> int
+    
+    # sets or inserts 'value' under the key 'index'
+    function set(index: str, value: int)
+    
+    # true if 'index' is indexed by this map
+    function has(index: str) -> bool
+    
+    # removes 'index' from this map and returns the mapped value
+    function pop(index: str) -> int

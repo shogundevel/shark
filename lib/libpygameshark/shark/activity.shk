@@ -72,6 +72,12 @@ class activity
     function event(type, x, y)
         pass
     
+    function text_event(text)
+        pass
+    
+    function cancel_event()
+        pass
+    
     function update()
         pass
     

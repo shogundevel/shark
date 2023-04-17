@@ -1,0 +1,49 @@
+
+import "shark.api"
+
+var b: texture = null
+var w: texture = null
+
+var r: float = 0.0
+var s: float = 1.0
+
+var U: bool = false
+var D: bool = false
+var L: bool = false
+var R: bool = false
+
+function launch()
+    b = load_texture("b.png")
+    w = load_texture("w.png")
+
+function event(type: int, x: int, y: int)
+    if type == E_PRESS_UP then
+        U = true
+    else if type == E_PRESS_DOWN then
+        D = true
+    else if type == E_PRESS_LEFT then
+        L = true
+    else if type == E_PRESS_RIGHT then
+        R = true
+    else if type == E_REL_UP then
+        U = false
+    else if type == E_REL_DOWN then
+        D = false
+    else if type == E_REL_LEFT then
+        L = false
+    else if type == E_REL_RIGHT then
+        R = false
+
+function update()
+    if U then
+        s += 0.05
+    if D then
+        s -= 0.05
+    if L then
+        r += 5.0
+    if R then
+        r -= 5.0
+
+function render()
+    draw_ex(w, 160, 96, 0, 0, 0.0, 5.0, 3.0)
+    draw_ex(b, 160, 96, 0, 0, r, s, s)

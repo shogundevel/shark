@@ -1,0 +1,66 @@
+###############################################################################
+### Copyright #################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+###############################################################################
+
+import "system/io.api"
+import "system/string.api"
+
+class shark_token (object)
+    var lineno: int
+    var type: str
+    var value: str
+    
+    function shark_token(lineno: int, type: str, value: str)
+
+class shark_lexer (object)
+    var filename: str
+    var source: FILE
+    var lineno: int
+    var current_char: char
+    var token: shark_token
+    var buffer: strbuf
+    var indent_token: shark_token
+    var dedent_token: shark_token
+    var indent_stack: [] int
+    var indent_depth: int
+    var indent_level: int
+    var dedent_count: int
+    var post_indent: bool
+    var delimiter_count: int
+    var empty_line: bool
+    
+    function shark_lexer(filename: str, source: FILE)
+    function error(message: str)
+    function emit(type: str, value: str) -> shark_token
+    function indent() -> shark_token
+    function emit_indent() -> shark_token
+    function emit_dedent() -> shark_token
+    function next() -> char
+    function match(value: char) -> bool
+    function skip_until(c: char, consume: bool)
+    function escape() -> char
+    function scan_name() -> shark_token
+    function scan_number(start: char) -> shark_token
+    function scan() -> shark_token

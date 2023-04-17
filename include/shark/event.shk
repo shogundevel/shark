@@ -40,3 +40,5 @@ var E_REL_LEFT = 12
 var E_REL_RIGHT = 13
 var E_REL_X = 14
 var E_REL_Y = 15
+
+function set_text_event(status)
