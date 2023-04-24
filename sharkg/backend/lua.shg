@@ -344,7 +344,7 @@ class shark_backend_lua
         self.call_stack.push(self.exp_base)
         self.push()
     
-    function inc_index(op: str)
+    function inc_index(op: str, type: shark_type)
         if op == "++" then
             op = "+"
         if op == "--" then
@@ -376,7 +376,7 @@ class shark_backend_lua
             return "-"
         return ""
     
-    function set_index(op: str)
+    function set_index(op: str, type: shark_type)
         self.buf.write(self.exp_base)
         self.buf.write("[")
         self.buf.write(self.exp_left)
@@ -395,7 +395,7 @@ class shark_backend_lua
         self.exp = self.buf.get()
         self.exit_assign()
     
-    function get_index()
+    function get_index(type: shark_type)
         self.buf.write(self.exp_left)
         self.buf.write("[")
         self.buf.write(self.exp)

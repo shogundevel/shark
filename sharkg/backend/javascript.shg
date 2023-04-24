@@ -357,7 +357,7 @@ class shark_backend_javascript
         self.call_stack.push(self.exp_base)
         self.push()
     
-    function inc_index(op: str)
+    function inc_index(op: str, type: shark_type)
         self.buf.write(self.exp_left)
         self.buf.write("[")
         self.buf.write(self.exp)
@@ -367,7 +367,7 @@ class shark_backend_javascript
         self.exp_left = cast(self.call_stack.pop(), str)
         self.exp = self.buf.get()
     
-    function set_index(op: str)
+    function set_index(op: str, type: shark_type)
         self.buf.write(self.exp_base)
         self.buf.write("[")
         self.buf.write(self.exp_left)
@@ -379,7 +379,7 @@ class shark_backend_javascript
         self.exp = self.buf.get()
         self.exit_assign()
     
-    function get_index()
+    function get_index(type: shark_type)
         self.buf.write(self.exp_left)
         self.buf.write("[")
         self.buf.write(self.exp)

@@ -26,8 +26,8 @@
 
 #include "shark.h"
 
-#include <SDL.h>
-#include <SDL_ttf.h>
+#include <SDL2/SDL.h>
+#include <SDL2/SDL_ttf.h>
 
 typedef struct _shark_type_texture *shark_type_texture;
 typedef struct _shark_class_texture shark_class_texture;

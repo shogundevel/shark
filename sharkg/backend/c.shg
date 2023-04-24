@@ -527,23 +527,21 @@ class shark_backend_c
     
     function for_stat()
         self.write_indent()
-        self.out.write("while (")
+        self.out.write("for (; ")
         if self.cond != null then
             self.out.write(self.cond)
         else
             self.out.write("true")
+        self.out.write(";")
+        if self.step != null then
+            self.out.write(" ")
+            self.out.write(self.step)
         self.out.write(") {\n")
     
     function exit_for()
-        if self.step != null then
-            self.indent()
-            self.write_indent()
-            self.dedent()
-            self.out.write(self.step)
-            self.out.write(";\n")
         self.write_indent()
         if self.init then
-            self.out.write("}} while (false);")
+            self.out.write("}} while (false);\n")
         else
             self.out.write("}\n")
         self.step = cast(self.call_stack.pop(), str)
@@ -623,7 +621,7 @@ class shark_backend_c
         self.call_stack.push(self.exp_base)
         self.push()
     
-    function inc_index(op: str)
+    function inc_index(op: str, type: shark_type)
         self.buf.write(self.exp_left)
         self.buf.write("->data[")
         self.buf.write(self.exp)
@@ -633,7 +631,7 @@ class shark_backend_c
         self.exp_left = cast(self.call_stack.pop(), str)
         self.exp = self.buf.get()
     
-    function set_index(op: str)
+    function set_index(op: str, type: shark_type)
         self.buf.write(self.exp_base)
         self.buf.write("->data[")
         self.buf.write(self.exp_left)
@@ -645,7 +643,7 @@ class shark_backend_c
         self.exp = self.buf.get()
         self.exit_assign()
     
-    function get_index()
+    function get_index(type: shark_type)
         self.buf.write(self.exp_left)
         self.buf.write("->data[")
         self.buf.write(self.exp)

@@ -80,7 +80,7 @@ shark_str shark_lib_itos(shark_int x)
 {
     char data[256];
     size_t size;
-    if ((size = sprintf(data, "%d", x)) > 256) shark_buffer_overflow();
+    if ((size = sprintf(data, "%ld", x)) > 256) shark_buffer_overflow();
     return shark_str_new(data);
 }
 

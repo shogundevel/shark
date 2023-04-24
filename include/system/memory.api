@@ -27,6 +27,18 @@
 import "system/string.api"
 import "system/data.api"
 
+# copies an integer array into another
+function int_copy(source: [] int, target: [] int)
+
+# copies a float array into another
+function float_copy(source: [] float, target: [] float)
+
+# copies a character array into another
+function char_copy(source: [] char, target: [] char)
+
+# copies an object array into another
+function object_copy(source: [] object, target: [] object)
+
 # frees (deletes) most types of objects, incluiding strings and arrays.
 # the object inmediately becomes a dangling reference, make sure you dont use it anymore.
 function free(value: object)

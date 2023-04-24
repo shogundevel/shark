@@ -159,13 +159,13 @@ class shark_backend
     function enter_index()
         shark_null_stat()
     
-    function inc_index(op: str)
+    function inc_index(op: str, type: shark_type)
         shark_null_stat()
     
-    function set_index(op: str)
+    function set_index(op: str, type: shark_type)
         shark_null_stat()
     
-    function get_index()
+    function get_index(type: shark_type)
         shark_null_stat()
     
     function call_method(function_object: shark_function)

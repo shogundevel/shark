@@ -97,9 +97,8 @@ SHARK_API void shark_object_dec_ref(void *self)
 
 SHARK_API bool shark_object_instanceof(shark_object *self, shark_class *type)
 {
-    for (shark_class *candidate = type; candidate != NULL; candidate = candidate->parent) {
-        if (self->type == candidate) return true;
-    }
+    for (shark_class *candidate = self->type; candidate != NULL; candidate = candidate->parent)
+        if (type == candidate) return true;
     return false;
 }
 

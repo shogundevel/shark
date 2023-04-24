@@ -815,13 +815,16 @@ class shark_compiler
                     self.write_error("array index should be an integer.")
                     self.error()
                 self.expect("]")
+                if self.match("[") then
+                    self.write_error("can't double index into an array, please refactor the code.")
+                    self.error()
                 self.exp_type = type.type
                 if self.match_inc() then
-                    self.backend.inc_index(self.assign_op)
+                    self.backend.inc_index(self.assign_op, type.type)
                 else if self.match_assign() then
-                    self.backend.set_index(self.assign_op)
+                    self.backend.set_index(self.assign_op, type.type)
                 else
-                    self.backend.get_index()
+                    self.backend.get_index(type.type)
             else if self.match(".") then
                 var name: str = self.consume("name")
                 if not instanceof(self.exp_type, shark_custom_type) then

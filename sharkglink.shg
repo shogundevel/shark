@@ -25,6 +25,7 @@
 ###############################################################################
 
 import "system/io.api"
+import "sharkg/path.shg"
 
 function main(args: [] str)
     if sizeof(args) < 4 then
@@ -32,8 +33,9 @@ function main(args: [] str)
         write(args[0])
         write(" <target> <source> <out> <libs>\n")
         write("\tLinks the given <filename> agains <libs> and places the result at <out>.\n")
-        write("\tTarget can be any of <py | js | lua | java | shk>\n")
+        write("\tTarget can be any of <py | js | lua | java>")
     else
+        var base: str = shark_path_get_base(args[0])
         var target: str = args[1]
         var filename: str = args[2]
         var source: FILE = open(filename, 'r')
@@ -43,44 +45,43 @@ function main(args: [] str)
             exit(EXIT_FAILURE)
         
         var out: FILE = open(args[3], 'w')
+        var buf: strbuf = new strbuf ()
         
         if out == null then
             write("can't open <out> for writing.")
             exit(EXIT_FAILURE)
-        else if target == "lua" then
-            out.write("require('sharkrt')\n")
         else if target == "py" then
             out.write("main = None\n")
         else if target == "java" then
-            var buf: strbuf = new strbuf ()
             for i: int = 4, i < sizeof(args), i++ do
                 buf.write(args[i])
                 buf.write(".import")
                 var lib: FILE = open(buf.get(), 'r')
                 if lib == null then
-                    continue
+                    buf.write(base)
+                    buf.write("/lib/")
+                    buf.write(args[i])
+                    buf.write(".import")
+                    lib = open(buf.get(), 'r')
+                    if lib == null then
+                        continue
                 while not lib.at_end() do
                     out.put(lib.fetch())
                 lib.close()
             out.write("public class Main {\n")
-        else if target == "shk" then
-            var buf: strbuf = new strbuf ()
-            for i: int = 4, i < sizeof(args), i++ do
-                buf.write(args[i])
-                buf.write(".import")
-                var lib: FILE = open(buf.get(), 'r')
-                if lib == null then
-                    continue
-                while not lib.at_end() do
-                    out.put(lib.fetch())
-                lib.close()
         
         for i: int = 4, i < sizeof(args), i++ do
             var lib: FILE = open(args[i], 'r')
             if lib == null then
-                write("can't open lib '")
-                write(args[i])
-                write(" for reading.")
+                buf.write(base)
+                buf.write("/lib/")
+                buf.write(args[i])
+                lib = open(buf.get(), 'r')
+                if lib == null then
+                    write("can't open lib '")
+                    write(args[i])
+                    write("' for reading.")
+                    continue
             while not lib.at_end() do
                 out.put(lib.fetch())
             lib.close()
@@ -99,8 +100,6 @@ function main(args: [] str)
             out.close()
         else if target == "java" then
             out.write("}")
-            out.close()
-        else if target == "shk" then
             out.close()
         else
             write("WARNING: can't recognize desired target '")

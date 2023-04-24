@@ -27,42 +27,45 @@ function main(args)
             out.write("main = None\n")
         else if target=="java" then
             var buf = new strbuf()
-            var i = 4
-            while i<sizeof(args) do
-                buf.write(args[i])
-                buf.write(".import")
-                var lib = open(buf.get(), 'r')
-                if lib==null then
-                    continue
-                while not lib.at_end() do
-                    out.put(lib.fetch())
-                lib.close()
-                i+=1
+            if true then
+                var i = 4
+                while i<sizeof(args) do
+                    buf.write(args[i])
+                    buf.write(".import")
+                    var lib = open(buf.get(), 'r')
+                    if lib==null then
+                        continue
+                    while not lib.at_end() do
+                        out.put(lib.fetch())
+                    lib.close()
+                    i+=1
             out.write("public class Main {\n")
         else if target=="shk" then
             var buf = new strbuf()
+            if true then
+                var i = 4
+                while i<sizeof(args) do
+                    buf.write(args[i])
+                    buf.write(".import")
+                    var lib = open(buf.get(), 'r')
+                    if lib==null then
+                        continue
+                    while not lib.at_end() do
+                        out.put(lib.fetch())
+                    lib.close()
+                    i+=1
+        if true then
             var i = 4
             while i<sizeof(args) do
-                buf.write(args[i])
-                buf.write(".import")
-                var lib = open(buf.get(), 'r')
+                var lib = open(args[i], 'r')
                 if lib==null then
-                    continue
+                    write("can't open lib '")
+                    write(args[i])
+                    write(" for reading.")
                 while not lib.at_end() do
                     out.put(lib.fetch())
                 lib.close()
                 i+=1
-        var i = 4
-        while i<sizeof(args) do
-            var lib = open(args[i], 'r')
-            if lib==null then
-                write("can't open lib '")
-                write(args[i])
-                write(" for reading.")
-            while not lib.at_end() do
-                out.put(lib.fetch())
-            lib.close()
-            i+=1
         while not source.at_end() do
             out.put(source.fetch())
         source.close()

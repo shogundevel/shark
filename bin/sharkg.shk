@@ -75,10 +75,11 @@ function shark_lexer_init_keywords()
         shark_lexer_keywords_list[33]="false"
         shark_lexer_keywords_list[34]="inline"
         shark_lexer_keywords_map=new strmap()
-        var i = 0
-        while i<sizeof(shark_lexer_keywords_list) do
-            shark_lexer_keywords_map.set(shark_lexer_keywords_list[i], i)
-            i+=1
+        if true then
+            var i = 0
+            while i<sizeof(shark_lexer_keywords_list) do
+                shark_lexer_keywords_map.set(shark_lexer_keywords_list[i], i)
+                i+=1
 class shark_lexer
     function init(filename, source)
         self.shark_lexer(filename, source)
@@ -208,159 +209,160 @@ class shark_lexer
         else if self.post_indent then
             self.post_indent=false
             return self.token
-        while true do
-            var c = self.next()
-            if c==' ' or c=='\t' or c=='\r' then
-                continue
-            else if c=='\n' then
-                self.indent_level=0
-                while self.match(' ') do
-                    self.indent_level+=1
-                var newline = null
-                if not self.empty_line and self.delimiter_count==0 then
-                    newline=self.emit("newline", "newline")
-                self.lineno+=1
-                self.empty_line=true
-                if newline!=null then
-                    return newline
-                else
+        if true then
+            while true do
+                var c = self.next()
+                if c==' ' or c=='\t' or c=='\r' then
                     continue
-            else if c=='\0' then
-                self.indent_level=0
-                var indent = self.indent()
-                self.emit("EOF", null)
-                if indent!=null then
-                    return indent
-                else
-                    return self.token
-            else if c=='#' then
-                self.skip_until('\n', false)
-            else if c==':' then
-                return self.emit("delimiter", ":")
-            else if c==';' then
-                return self.emit("delimiter", ";")
-            else if c=='.' then
-                return self.emit("delimiter", ".")
-            else if c==',' then
-                return self.emit("delimiter", ",")
-            else if c=='[' then
-                self.delimiter_count+=1
-                return self.emit("delimiter", "[")
-            else if c==']' then
-                self.delimiter_count-=1
-                return self.emit("delimiter", "]")
-            else if c=='{' then
-                self.delimiter_count+=1
-                return self.emit("delimiter", "{")
-            else if c=='}' then
-                self.delimiter_count-=1
-                return self.emit("delimiter", "}")
-            else if c=='(' then
-                self.delimiter_count+=1
-                return self.emit("delimiter", "(")
-            else if c==')' then
-                self.delimiter_count-=1
-                return self.emit("delimiter", ")")
-            else if c=='*' then
-                if self.match('=') then
-                    return self.emit("assign", "*=")
-                else
-                    return self.emit("operator", "*")
-            else if c=='/' then
-                if self.match('=') then
-                    return self.emit("assign", "/=")
-                else
-                    return self.emit("operator", "/")
-            else if c=='%' then
-                if self.match('=') then
-                    return self.emit("assign", "%=")
-                else
-                    return self.emit("operator", "%")
-            else if c=='+' then
-                if self.match('+') then
-                    return self.emit("operator", "++")
-                else if self.match('=') then
-                    return self.emit("assign", "+=")
-                else
-                    return self.emit("operator", "+")
-            else if c=='-' then
-                if isdigit(self.current_char) then
-                    self.buffer.put('-')
-                    return self.scan_number(self.next())
-                else if self.match('>') then
-                    return self.emit("delimiter", "->")
-                else if self.match('-') then
-                    return self.emit("operator", "--")
-                else if self.match('=') then
-                    return self.emit("assign", "-=")
-                else
-                    return self.emit("operator", "-")
-            else if c=='<' then
-                if self.match('=') then
-                    return self.emit("operator", "<=")
-                else if self.match('<') then
-                    return self.emit("operator", "<<")
-                else
-                    return self.emit("operator", "<")
-            else if c=='>' then
-                if self.match('=') then
-                    return self.emit("operator", ">=")
-                else if self.match('>') then
-                    return self.emit("operator", ">>")
-                else
-                    return self.emit("operator", ">")
-            else if c=='=' then
-                if self.match('=') then
-                    return self.emit("operator", "==")
-                else
-                    return self.emit("assign", "=")
-            else if c=='!' then
-                if self.match('=') then
-                    return self.emit("operator", "!=")
-                else
-                    return self.emit("operator", "!")
-            else if c=='~' then
-                return self.emit("operator", "~")
-            else if c=='&' then
-                return self.emit("operator", "&")
-            else if c=='|' then
-                return self.emit("operator", "|")
-            else if c=='^' then
-                return self.emit("operator", "^")
-            else if c=='"' then
-                self.buffer.put('"')
-                while not self.match('"') do
-                    var c2 = self.next()
-                    self.buffer.put(c2)
-                    if c2=='\\' then
+                else if c=='\n' then
+                    self.indent_level=0
+                    while self.match(' ') do
+                        self.indent_level+=1
+                    var newline = null
+                    if not self.empty_line and self.delimiter_count==0 then
+                        newline=self.emit("newline", "newline")
+                    self.lineno+=1
+                    self.empty_line=true
+                    if newline!=null then
+                        return newline
+                    else
+                        continue
+                else if c=='\0' then
+                    self.indent_level=0
+                    var indent = self.indent()
+                    self.emit("EOF", null)
+                    if indent!=null then
+                        return indent
+                    else
+                        return self.token
+                else if c=='#' then
+                    self.skip_until('\n', false)
+                else if c==':' then
+                    return self.emit("delimiter", ":")
+                else if c==';' then
+                    return self.emit("delimiter", ";")
+                else if c=='.' then
+                    return self.emit("delimiter", ".")
+                else if c==',' then
+                    return self.emit("delimiter", ",")
+                else if c=='[' then
+                    self.delimiter_count+=1
+                    return self.emit("delimiter", "[")
+                else if c==']' then
+                    self.delimiter_count-=1
+                    return self.emit("delimiter", "]")
+                else if c=='{' then
+                    self.delimiter_count+=1
+                    return self.emit("delimiter", "{")
+                else if c=='}' then
+                    self.delimiter_count-=1
+                    return self.emit("delimiter", "}")
+                else if c=='(' then
+                    self.delimiter_count+=1
+                    return self.emit("delimiter", "(")
+                else if c==')' then
+                    self.delimiter_count-=1
+                    return self.emit("delimiter", ")")
+                else if c=='*' then
+                    if self.match('=') then
+                        return self.emit("assign", "*=")
+                    else
+                        return self.emit("operator", "*")
+                else if c=='/' then
+                    if self.match('=') then
+                        return self.emit("assign", "/=")
+                    else
+                        return self.emit("operator", "/")
+                else if c=='%' then
+                    if self.match('=') then
+                        return self.emit("assign", "%=")
+                    else
+                        return self.emit("operator", "%")
+                else if c=='+' then
+                    if self.match('+') then
+                        return self.emit("operator", "++")
+                    else if self.match('=') then
+                        return self.emit("assign", "+=")
+                    else
+                        return self.emit("operator", "+")
+                else if c=='-' then
+                    if isdigit(self.current_char) then
+                        self.buffer.put('-')
+                        return self.scan_number(self.next())
+                    else if self.match('>') then
+                        return self.emit("delimiter", "->")
+                    else if self.match('-') then
+                        return self.emit("operator", "--")
+                    else if self.match('=') then
+                        return self.emit("assign", "-=")
+                    else
+                        return self.emit("operator", "-")
+                else if c=='<' then
+                    if self.match('=') then
+                        return self.emit("operator", "<=")
+                    else if self.match('<') then
+                        return self.emit("operator", "<<")
+                    else
+                        return self.emit("operator", "<")
+                else if c=='>' then
+                    if self.match('=') then
+                        return self.emit("operator", ">=")
+                    else if self.match('>') then
+                        return self.emit("operator", ">>")
+                    else
+                        return self.emit("operator", ">")
+                else if c=='=' then
+                    if self.match('=') then
+                        return self.emit("operator", "==")
+                    else
+                        return self.emit("assign", "=")
+                else if c=='!' then
+                    if self.match('=') then
+                        return self.emit("operator", "!=")
+                    else
+                        return self.emit("operator", "!")
+                else if c=='~' then
+                    return self.emit("operator", "~")
+                else if c=='&' then
+                    return self.emit("operator", "&")
+                else if c=='|' then
+                    return self.emit("operator", "|")
+                else if c=='^' then
+                    return self.emit("operator", "^")
+                else if c=='"' then
+                    self.buffer.put('"')
+                    while not self.match('"') do
+                        var c2 = self.next()
+                        self.buffer.put(c2)
+                        if c2=='\\' then
+                            self.buffer.put(self.escape())
+                        else if c2=='\n' then
+                            self.error("unexpected EOL while scanning string literal.")
+                    self.buffer.put('"')
+                    return self.emit("str", self.buffer.get())
+                else if c=='\'' then
+                    self.buffer.put('\'')
+                    if self.match('\\') then
+                        self.buffer.put('\\')
                         self.buffer.put(self.escape())
-                    else if c2=='\n' then
-                        self.error("unexpected EOL while scanning string literal.")
-                self.buffer.put('"')
-                return self.emit("str", self.buffer.get())
-            else if c=='\'' then
-                self.buffer.put('\'')
-                if self.match('\\') then
-                    self.buffer.put('\\')
-                    self.buffer.put(self.escape())
-                else if self.match('\'') then
-                    self.error("expected at least one character in char literal (try escaping the quote with \\).")
-                else if self.match('\n') then
-                    self.error("unexpected EOL while scanning character literal.")
+                    else if self.match('\'') then
+                        self.error("expected at least one character in char literal (try escaping the quote with \\).")
+                    else if self.match('\n') then
+                        self.error("unexpected EOL while scanning character literal.")
+                    else
+                        self.buffer.put(self.next())
+                    if not self.match('\'') then
+                        self.error("expected a quote to close character literal.")
+                    self.buffer.put('\'')
+                    return self.emit("char", self.buffer.get())
                 else
-                    self.buffer.put(self.next())
-                if not self.match('\'') then
-                    self.error("expected a quote to close character literal.")
-                self.buffer.put('\'')
-                return self.emit("char", self.buffer.get())
-            else
-                if isalpha(c) or c=='_' then
-                    self.buffer.put(c)
-                    return self.scan_name()
-                else if isdigit(c) then
-                    return self.scan_number(c)
-                else
-                    self.error("invalid character.")
+                    if isalpha(c) or c=='_' then
+                        self.buffer.put(c)
+                        return self.scan_name()
+                    else if isdigit(c) then
+                        return self.scan_number(c)
+                    else
+                        self.error("invalid character.")
 class shark_namespace
     function init(parent)
         self.shark_namespace(parent)
@@ -418,11 +420,12 @@ class shark_custom_type(shark_type)
         self.methods=new list()
         self.constructor=null
         if parent!=null then
-            var i = 0
-            while i<parent.namespace.data.size() do
-                var value = parent.namespace.data.get(i)
-                self.namespace.add(shark_object_get_name(value), value)
-                i+=1
+            if true then
+                var i = 0
+                while i<parent.namespace.data.size() do
+                    var value = parent.namespace.data.get(i)
+                    self.namespace.add(shark_object_get_name(value), value)
+                    i+=1
             self.constructor=parent.constructor
     function issubtype(other)
         var parent = self.parent
@@ -646,10 +649,11 @@ class shark_backend_c(shark_backend)
     function dedent()
         self.indent_level-=1
     function write_indent()
-        var i = 0
-        while i<self.indent_level do
-            self.out.write("    ")
-            i+=1
+        if true then
+            var i = 0
+            while i<self.indent_level do
+                self.out.write("    ")
+                i+=1
     function begin(out)
         self.buf=new strbuf()
         self.out=open(out, 'w')
@@ -720,16 +724,17 @@ class shark_backend_c(shark_backend)
             self.out.write(" __super;\n")
         else
             self.out.write("shark_object __super;\n")
-        var i = 0
-        while i<type.fields.size() do
-            var field = type.fields.get(i)
-            self.write_type_name(field.type)
-            self.write_indent()
-            self.out.write(self.buf.get())
-            self.out.write(" ")
-            self.out.write(field.name)
-            self.out.write(";\n")
-            i+=1
+        if true then
+            var i = 0
+            while i<type.fields.size() do
+                var field = type.fields.get(i)
+                self.write_type_name(field.type)
+                self.write_indent()
+                self.out.write(self.buf.get())
+                self.out.write(" ")
+                self.out.write(field.name)
+                self.out.write(";\n")
+                i+=1
         self.dedent()
         self.out.write("};\n")
         self.out.write("struct _")
@@ -743,26 +748,28 @@ class shark_backend_c(shark_backend)
             self.out.write(" __super;\n")
         else
             self.out.write("shark_object_class __super;\n")
-        var i = 0
-        while i<type.methods.size() do
-            var method = type.methods.get(i)
-            self.write_indent()
-            if method.type==null then
-                self.out.write("void (*")
-            else
-                self.write_type_name(method.type)
-                self.out.write(self.buf.get())
-                self.out.write(" (*")
-            self.out.write(method.name)
-            self.out.write(")(void *")
-            var k = 0
-            while k<method.arg_types.size() do
-                self.out.write(", ")
-                self.write_type_name(method.arg_types.get(k))
-                self.out.write(self.buf.get())
-                k+=1
-            self.out.write(");\n")
-            i+=1
+        if true then
+            var i = 0
+            while i<type.methods.size() do
+                var method = type.methods.get(i)
+                self.write_indent()
+                if method.type==null then
+                    self.out.write("void (*")
+                else
+                    self.write_type_name(method.type)
+                    self.out.write(self.buf.get())
+                    self.out.write(" (*")
+                self.out.write(method.name)
+                self.out.write(")(void *")
+                if true then
+                    var k = 0
+                    while k<method.arg_types.size() do
+                        self.out.write(", ")
+                        self.write_type_name(method.arg_types.get(k))
+                        self.out.write(self.buf.get())
+                        k+=1
+                self.out.write(");\n")
+                i+=1
         self.dedent()
         self.out.write("};\nextern ")
         self.out.write(class_name)
@@ -776,29 +783,32 @@ class shark_backend_c(shark_backend)
     function exit_type_impl()
         var type_count = 0
         var call_table = ""
-        var type = self.type_context
-        while type!=null do
+        if true then
+            var type = self.type_context
+            while type!=null do
+                if true then
+                    var i = 0
+                    while i<type.methods.size() do
+                        self.buf.write(", ")
+                        var method = type.methods.get(i)
+                        self.buf.write("shark_lib_")
+                        if self.impl_table.has(method.name) then
+                            self.buf.write(self.type_context.name)
+                        else
+                            self.buf.write(type.name)
+                        self.buf.write("_")
+                        self.buf.write(method.name)
+                        i+=1
+                self.buf.write("}")
+                self.buf.write(call_table)
+                call_table=self.buf.get()
+                type_count+=1
+                type=type.parent
+        if true then
             var i = 0
-            while i<type.methods.size() do
-                self.buf.write(", ")
-                var method = type.methods.get(i)
-                self.buf.write("shark_lib_")
-                if self.impl_table.has(method.name) then
-                    self.buf.write(self.type_context.name)
-                else
-                    self.buf.write(type.name)
-                self.buf.write("_")
-                self.buf.write(method.name)
+            while i<type_count do
+                self.buf.write("{")
                 i+=1
-            self.buf.write("}")
-            self.buf.write(call_table)
-            call_table=self.buf.get()
-            type_count+=1
-            type=type.parent
-        var i = 0
-        while i<type_count do
-            self.buf.write("{")
-            i+=1
         self.buf.write("{ sizeof(struct _shark_type_")
         self.buf.write(self.type_context.name)
         self.buf.write("), ")
@@ -843,29 +853,31 @@ class shark_backend_c(shark_backend)
         self.out.write("_")
         self.out.write(function_object.name)
         self.out.write("(void *self")
-        var i = 0
-        while i<function_object.arg_names.size() do
-            self.out.write(", ")
-            self.write_type_name(function_object.arg_types.get(i))
-            self.out.write(self.buf.get())
-            self.out.write(" ")
-            self.out.write(function_object.arg_names.get(i))
-            i+=1
+        if true then
+            var i = 0
+            while i<function_object.arg_names.size() do
+                self.out.write(", ")
+                self.write_type_name(function_object.arg_types.get(i))
+                self.out.write(self.buf.get())
+                self.out.write(" ")
+                self.out.write(function_object.arg_names.get(i))
+                i+=1
         self.out.write(");\n")
         self.out.write("shark_type_")
         self.out.write(self.type_context.name)
         self.out.write(" shark_type_")
         self.out.write(self.type_context.name)
         self.out.write("_new(")
-        var i = 0
-        while i<function_object.arg_names.size() do
-            if i!=0 then
-                self.out.write(", ")
-            self.write_type_name(function_object.arg_types.get(i))
-            self.out.write(self.buf.get())
-            self.out.write(" ")
-            self.out.write(function_object.arg_names.get(i))
-            i+=1
+        if true then
+            var i = 0
+            while i<function_object.arg_names.size() do
+                if i!=0 then
+                    self.out.write(", ")
+                self.write_type_name(function_object.arg_types.get(i))
+                self.out.write(self.buf.get())
+                self.out.write(" ")
+                self.out.write(function_object.arg_names.get(i))
+                i+=1
         self.out.write(");\n")
     function declare_method(function_object)
         if function_object.type!=null then
@@ -878,14 +890,15 @@ class shark_backend_c(shark_backend)
         self.out.write("_")
         self.out.write(function_object.name)
         self.out.write("(void *self")
-        var i = 0
-        while i<function_object.arg_names.size() do
-            self.out.write(", ")
-            self.write_type_name(function_object.arg_types.get(i))
-            self.out.write(self.buf.get())
-            self.out.write(" ")
-            self.out.write(function_object.arg_names.get(i))
-            i+=1
+        if true then
+            var i = 0
+            while i<function_object.arg_names.size() do
+                self.out.write(", ")
+                self.write_type_name(function_object.arg_types.get(i))
+                self.out.write(self.buf.get())
+                self.out.write(" ")
+                self.out.write(function_object.arg_names.get(i))
+                i+=1
         self.out.write(");\n")
     function declare_function(function_object)
         if function_object.type!=null then
@@ -896,15 +909,16 @@ class shark_backend_c(shark_backend)
         self.out.write(" shark_lib_")
         self.out.write(function_object.name)
         self.out.write("(")
-        var i = 0
-        while i<function_object.arg_names.size() do
-            if i!=0 then
-                self.out.write(", ")
-            self.write_type_name(function_object.arg_types.get(i))
-            self.out.write(self.buf.get())
-            self.out.write(" ")
-            self.out.write(function_object.arg_names.get(i))
-            i+=1
+        if true then
+            var i = 0
+            while i<function_object.arg_names.size() do
+                if i!=0 then
+                    self.out.write(", ")
+                self.write_type_name(function_object.arg_types.get(i))
+                self.out.write(self.buf.get())
+                self.out.write(" ")
+                self.out.write(function_object.arg_names.get(i))
+                i+=1
         self.out.write(");\n")
     function close_function_declaration()
         shark_null_stat()
@@ -915,15 +929,16 @@ class shark_backend_c(shark_backend)
             self.out.write(" shark_type_")
             self.out.write(self.type_context.name)
             self.out.write("_new(")
-            var i = 0
-            while i<function_object.arg_names.size() do
-                if i!=0 then
-                    self.out.write(", ")
-                self.write_type_name(function_object.arg_types.get(i))
-                self.out.write(self.buf.get())
-                self.out.write(" ")
-                self.out.write(function_object.arg_names.get(i))
-                i+=1
+            if true then
+                var i = 0
+                while i<function_object.arg_names.size() do
+                    if i!=0 then
+                        self.out.write(", ")
+                    self.write_type_name(function_object.arg_types.get(i))
+                    self.out.write(self.buf.get())
+                    self.out.write(" ")
+                    self.out.write(function_object.arg_names.get(i))
+                    i+=1
             self.out.write(") {")
             self.indent()
             self.write_indent()
@@ -938,11 +953,12 @@ class shark_backend_c(shark_backend)
             self.out.write("_")
             self.out.write(self.type_context.name)
             self.out.write("(self")
-            var i = 0
-            while i<function_object.arg_names.size() do
-                self.out.write(", ")
-                self.out.write(function_object.arg_names.get(i))
-                i+=1
+            if true then
+                var i = 0
+                while i<function_object.arg_names.size() do
+                    self.out.write(", ")
+                    self.out.write(function_object.arg_names.get(i))
+                    i+=1
             self.out.write(");\n")
             self.write_indent()
             self.out.write("return self;\n")
@@ -964,15 +980,16 @@ class shark_backend_c(shark_backend)
             self.out.write("void *self")
             if function_object.arg_names.size()!=0 then
                 self.out.write(", ")
-        var i = 0
-        while i<function_object.arg_names.size() do
-            if i!=0 then
-                self.out.write(", ")
-            self.write_type_name(function_object.arg_types.get(i))
-            self.out.write(self.buf.get())
-            self.out.write(" ")
-            self.out.write(function_object.arg_names.get(i))
-            i+=1
+        if true then
+            var i = 0
+            while i<function_object.arg_names.size() do
+                if i!=0 then
+                    self.out.write(", ")
+                self.write_type_name(function_object.arg_types.get(i))
+                self.out.write(self.buf.get())
+                self.out.write(" ")
+                self.out.write(function_object.arg_names.get(i))
+                i+=1
         self.out.write(") {\n")
     function exit_function()
         self.out.write("}\n")
@@ -1174,11 +1191,12 @@ class shark_backend_c(shark_backend)
     function write_args()
         if self.call_args.size()!=0 then
             self.buf.write(self.call_args.get(0))
-            var i = 1
-            while i<self.call_args.size() do
-                self.buf.write(", ")
-                self.buf.write(self.call_args.get(i))
-                i+=1
+            if true then
+                var i = 1
+                while i<self.call_args.size() do
+                    self.buf.write(", ")
+                    self.buf.write(self.call_args.get(i))
+                    i+=1
     function enter_call()
         self.call_stack.push(self.exp_left)
         self.call_stack.push(self.exp_base)
@@ -1359,10 +1377,11 @@ class shark_backend_java(shark_backend)
     function dedent()
         self.indent_level-=1
     function write_indent()
-        var i = 0
-        while i<self.indent_level do
-            self.out.write("    ")
-            i+=1
+        if true then
+            var i = 0
+            while i<self.indent_level do
+                self.out.write("    ")
+                i+=1
     function begin(out)
         self.buf=new strbuf()
         self.path=out
@@ -1408,17 +1427,18 @@ class shark_backend_java(shark_backend)
             self.out.write(type.parent.name)
         self.out.write("\n{\n")
         self.indent()
-        var i = 0
-        while i<type.fields.size() do
-            var field = type.fields.get(i)
-            self.write_indent()
-            self.out.write("public ")
-            self.write_type(field.type)
-            self.out.write(self.buf.get())
-            self.out.write(" ")
-            self.out.write(field.name)
-            self.out.write(";\n")
-            i+=1
+        if true then
+            var i = 0
+            while i<type.fields.size() do
+                var field = type.fields.get(i)
+                self.write_indent()
+                self.out.write("public ")
+                self.write_type(field.type)
+                self.out.write(self.buf.get())
+                self.out.write(" ")
+                self.out.write(field.name)
+                self.out.write(";\n")
+                i+=1
     function exit_type_impl()
         self.dedent()
         self.exit_source()
@@ -1483,15 +1503,16 @@ class shark_backend_java(shark_backend)
             self.out.write(function_object.name)
             self.function_context=function_object
         self.out.write("(")
-        var i = 0
-        while i<function_object.arg_names.size() do
-            if i!=0 then
-                self.out.write(", ")
-            self.write_type(function_object.arg_types.get(i))
-            self.out.write(self.buf.get())
-            self.out.write(" ")
-            self.out.write(function_object.arg_names.get(i))
-            i+=1
+        if true then
+            var i = 0
+            while i<function_object.arg_names.size() do
+                if i!=0 then
+                    self.out.write(", ")
+                self.write_type(function_object.arg_types.get(i))
+                self.out.write(self.buf.get())
+                self.out.write(" ")
+                self.out.write(function_object.arg_names.get(i))
+                i+=1
         self.out.write(") {\n")
         if function_object.source_type!=null and function_object.name==function_object.source_type.name then
             if function_object.source_type.constructor!=null then
@@ -1688,11 +1709,12 @@ class shark_backend_java(shark_backend)
     function write_args()
         if self.call_args.size()!=0 then
             self.buf.write(self.call_args.get(0))
-            var i = 1
-            while i<self.call_args.size() do
-                self.buf.write(", ")
-                self.buf.write(self.call_args.get(i))
-                i+=1
+            if true then
+                var i = 1
+                while i<self.call_args.size() do
+                    self.buf.write(", ")
+                    self.buf.write(self.call_args.get(i))
+                    i+=1
     function enter_call()
         self.call_stack.push(self.exp_left)
         self.call_stack.push(self.exp_base)
@@ -1830,10 +1852,11 @@ class shark_backend_javascript(shark_backend)
     function dedent()
         self.indent_level-=1
     function write_indent()
-        var i = 0
-        while i<self.indent_level do
-            self.out.write("    ")
-            i+=1
+        if true then
+            var i = 0
+            while i<self.indent_level do
+                self.out.write("    ")
+                i+=1
     function begin(out)
         self.buf=new strbuf()
         self.out=open(out, 'w')
@@ -1903,21 +1926,23 @@ class shark_backend_javascript(shark_backend)
             if function_object.name==function_object.source_type.name then
                 self.out.write(function_object.name)
                 self.out.write(".prototype.construct = function (")
-                var i = 0
-                while i<function_object.arg_names.size() do
-                    if i!=0 then
-                        self.out.write(", ")
-                    self.out.write(function_object.arg_names.get(i))
-                    i+=1
+                if true then
+                    var i = 0
+                    while i<function_object.arg_names.size() do
+                        if i!=0 then
+                            self.out.write(", ")
+                        self.out.write(function_object.arg_names.get(i))
+                        i+=1
                 self.out.write(") { this.")
                 self.out.write(function_object.name)
                 self.out.write("(")
-                var i = 0
-                while i<function_object.arg_names.size() do
-                    if i!=0 then
-                        self.out.write(", ")
-                    self.out.write(function_object.arg_names.get(i))
-                    i+=1
+                if true then
+                    var i = 0
+                    while i<function_object.arg_names.size() do
+                        if i!=0 then
+                            self.out.write(", ")
+                        self.out.write(function_object.arg_names.get(i))
+                        i+=1
                 self.out.write("); return this; };\n")
             self.out.write(self.type_context)
             self.out.write(".prototype.")
@@ -1927,12 +1952,13 @@ class shark_backend_javascript(shark_backend)
             self.out.write("function ")
             self.out.write(function_object.name)
         self.out.write("(")
-        var i = 0
-        while i<function_object.arg_names.size() do
-            if i!=0 then
-                self.out.write(", ")
-            self.out.write(function_object.arg_names.get(i))
-            i+=1
+        if true then
+            var i = 0
+            while i<function_object.arg_names.size() do
+                if i!=0 then
+                    self.out.write(", ")
+                self.out.write(function_object.arg_names.get(i))
+                i+=1
         self.out.write(") {\n")
     function exit_function()
         self.out.write("}\n")
@@ -2107,11 +2133,12 @@ class shark_backend_javascript(shark_backend)
     function write_args()
         if self.call_args.size()!=0 then
             self.buf.write(self.call_args.get(0))
-            var i = 1
-            while i<self.call_args.size() do
-                self.buf.write(", ")
-                self.buf.write(self.call_args.get(i))
-                i+=1
+            if true then
+                var i = 1
+                while i<self.call_args.size() do
+                    self.buf.write(", ")
+                    self.buf.write(self.call_args.get(i))
+                    i+=1
     function enter_call()
         self.call_stack.push(self.exp_left)
         self.call_stack.push(self.exp_base)
@@ -2242,10 +2269,11 @@ class shark_backend_lua(shark_backend)
     function dedent()
         self.indent_level-=1
     function write_indent()
-        var i = 0
-        while i<self.indent_level do
-            self.out.write("    ")
-            i+=1
+        if true then
+            var i = 0
+            while i<self.indent_level do
+                self.out.write("    ")
+                i+=1
     function begin(out)
         self.buf=new strbuf()
         self.out=open(out, 'w')
@@ -2314,12 +2342,13 @@ class shark_backend_lua(shark_backend)
             self.out.write("self")
             if function_object.arg_names.size()!=0 then
                 self.out.write(", ")
-        var i = 0
-        while i<function_object.arg_names.size() do
-            if i!=0 then
-                self.out.write(", ")
-            self.out.write(function_object.arg_names.get(i))
-            i+=1
+        if true then
+            var i = 0
+            while i<function_object.arg_names.size() do
+                if i!=0 then
+                    self.out.write(", ")
+                self.out.write(function_object.arg_names.get(i))
+                i+=1
         self.out.write(")\n")
     function exit_function()
         self.out.write("end\n")
@@ -2539,11 +2568,12 @@ class shark_backend_lua(shark_backend)
     function write_args()
         if self.call_args.size()!=0 then
             self.buf.write(self.call_args.get(0))
-            var i = 1
-            while i<self.call_args.size() do
-                self.buf.write(", ")
-                self.buf.write(self.call_args.get(i))
-                i+=1
+            if true then
+                var i = 1
+                while i<self.call_args.size() do
+                    self.buf.write(", ")
+                    self.buf.write(self.call_args.get(i))
+                    i+=1
     function enter_call()
         self.call_stack.push(self.exp_left)
         self.call_stack.push(self.exp_base)
@@ -2694,10 +2724,11 @@ class shark_backend_python(shark_backend)
     function dedent()
         self.indent_level-=1
     function write_indent()
-        var i = 0
-        while i<self.indent_level do
-            self.out.write("    ")
-            i+=1
+        if true then
+            var i = 0
+            while i<self.indent_level do
+                self.out.write("    ")
+                i+=1
     function begin(out)
         self.buf=new strbuf()
         self.out=open(out, 'w')
@@ -2765,11 +2796,12 @@ class shark_backend_python(shark_backend)
                 self.out.write(", ")
         if function_object.arg_names.size()!=0 then
             self.out.write(function_object.arg_names.get(0))
-        var i = 1
-        while i<function_object.arg_names.size() do
-            self.out.write(", ")
-            self.out.write(function_object.arg_names.get(i))
-            i+=1
+        if true then
+            var i = 1
+            while i<function_object.arg_names.size() do
+                self.out.write(", ")
+                self.out.write(function_object.arg_names.get(i))
+                i+=1
         self.out.write("):\n")
         self.globals=new strmap()
     function exit_function()
@@ -2939,11 +2971,12 @@ class shark_backend_python(shark_backend)
     function write_args()
         if self.call_args.size()!=0 then
             self.buf.write(self.call_args.get(0))
-            var i = 1
-            while i<self.call_args.size() do
-                self.buf.write(", ")
-                self.buf.write(self.call_args.get(i))
-                i+=1
+            if true then
+                var i = 1
+                while i<self.call_args.size() do
+                    self.buf.write(", ")
+                    self.buf.write(self.call_args.get(i))
+                    i+=1
     function enter_call()
         self.call_stack.push(self.exp_left)
         self.call_stack.push(self.exp_base)
@@ -3085,10 +3118,11 @@ class shark_backend_shark(shark_backend)
     function dedent()
         self.indent_level-=1
     function write_indent()
-        var i = 0
-        while i<self.indent_level do
-            self.out.write("    ")
-            i+=1
+        if true then
+            var i = 0
+            while i<self.indent_level do
+                self.out.write("    ")
+                i+=1
     function begin(out)
         self.buf=new strbuf()
         self.out=open(out, 'w')
@@ -3146,32 +3180,35 @@ class shark_backend_shark(shark_backend)
         if (function_object.source_type!=null and function_object.name==function_object.source_type.name) then
             self.write_indent()
             self.out.write("function init(")
-            var i = 0
-            while i<function_object.arg_names.size() do
-                if i!=0 then
-                    self.out.write(", ")
-                self.out.write(function_object.arg_names.get(i))
-                i+=1
+            if true then
+                var i = 0
+                while i<function_object.arg_names.size() do
+                    if i!=0 then
+                        self.out.write(", ")
+                    self.out.write(function_object.arg_names.get(i))
+                    i+=1
             self.out.write(")\n        self.")
             self.out.write(function_object.name)
             self.out.write("(")
-            var i = 0
-            while i<function_object.arg_names.size() do
-                if i!=0 then
-                    self.out.write(", ")
-                self.out.write(function_object.arg_names.get(i))
-                i+=1
+            if true then
+                var i = 0
+                while i<function_object.arg_names.size() do
+                    if i!=0 then
+                        self.out.write(", ")
+                    self.out.write(function_object.arg_names.get(i))
+                    i+=1
             self.out.write(")\n")
         self.write_indent()
         self.out.write("function ")
         self.out.write(function_object.name)
         self.out.write("(")
-        var i = 0
-        while i<function_object.arg_names.size() do
-            if i!=0 then
-                self.out.write(", ")
-            self.out.write(function_object.arg_names.get(i))
-            i+=1
+        if true then
+            var i = 0
+            while i<function_object.arg_names.size() do
+                if i!=0 then
+                    self.out.write(", ")
+                self.out.write(function_object.arg_names.get(i))
+                i+=1
         self.out.write(")\n")
     function exit_function()
         shark_null_stat()
@@ -3214,6 +3251,9 @@ class shark_backend_shark(shark_backend)
         self.cond=null
         self.call_stack.push(self.step)
         self.step=null
+        self.write_indent()
+        self.out.write("if true then\n")
+        self.indent()
     function push()
         self.exp_base=self.exp_left
         self.exp_left=self.exp
@@ -3244,6 +3284,7 @@ class shark_backend_shark(shark_backend)
             self.out.write(self.step)
             self.out.write("\n")
         self.step=self.call_stack.pop()
+        self.dedent()
     function break_stat()
         self.write_indent()
         self.out.write("break\n")
@@ -3333,11 +3374,12 @@ class shark_backend_shark(shark_backend)
     function write_args()
         if self.call_args.size()!=0 then
             self.buf.write(self.call_args.get(0))
-            var i = 1
-            while i<self.call_args.size() do
-                self.buf.write(", ")
-                self.buf.write(self.call_args.get(i))
-                i+=1
+            if true then
+                var i = 1
+                while i<self.call_args.size() do
+                    self.buf.write(", ")
+                    self.buf.write(self.call_args.get(i))
+                    i+=1
     function enter_call()
         self.call_stack.push(self.exp_left)
         self.call_stack.push(self.call_args)
@@ -3617,13 +3659,14 @@ class shark_compiler
             self.import_record.set(import_path, 0)
             var filename = null
             var source = null
-            var i = 0
-            while i<self.include.size() do
-                filename=shark_path_join(self.include.get(i), import_path)
-                source=open(filename, 'r')
-                if source!=null then
-                    break
-                i+=1
+            if true then
+                var i = 0
+                while i<self.include.size() do
+                    filename=shark_path_join(self.include.get(i), import_path)
+                    source=open(filename, 'r')
+                    if source!=null then
+                        break
+                    i+=1
             if source==null then
                 self.write_error("can't resolve import '")
                 self.write_error(import_path)
@@ -3887,10 +3930,11 @@ class shark_compiler
                     self.error()
                 self.backend.enter_function(func)
                 var context = new shark_namespace(null)
-                var i = 0
-                while i<self.arg_names.size() do
-                    context.add(self.arg_names.get(i), new shark_variable(self.arg_names.get(i), self.arg_types.get(i)))
-                    i+=1
+                if true then
+                    var i = 0
+                    while i<self.arg_names.size() do
+                        context.add(self.arg_names.get(i), new shark_variable(self.arg_names.get(i), self.arg_types.get(i)))
+                        i+=1
                 self.do_block(context)
                 self.backend.exit_function()
             self.function_context=null
@@ -3914,11 +3958,12 @@ class shark_compiler
     function function_equals(xargs, yargs, xtype, ytype)
         if xargs.size()!=yargs.size() then
             return false
-        var i = 0
-        while i<xargs.size() do
-            if not xargs.get(i).equals(yargs.get(i)) then
-                return false
-            i+=1
+        if true then
+            var i = 0
+            while i<xargs.size() do
+                if not xargs.get(i).equals(yargs.get(i)) then
+                    return false
+                i+=1
         return xtype==ytype or (xtype!=null and xtype.equals(ytype))
     function inline_stat()
         if self.match("inline") then
@@ -4413,10 +4458,11 @@ function main(args)
         var include = new list()
         include.push(shark_path_join(root, "include"))
         include.push(shark_path_get_base(filename))
-        var i = 4
-        while i<sizeof(args) do
-            include.push(args[i])
-            i+=1
+        if true then
+            var i = 4
+            while i<sizeof(args) do
+                include.push(args[i])
+                i+=1
         var backend = null
         if target=="c" then
             backend=new shark_backend_c()

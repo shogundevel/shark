@@ -155,22 +155,28 @@ Also try tipying 'shark tool build' without arguments to learn more about this t
 
 To show you how compiling, linking to libraries and executing a SharkG codebase works I'm going to build and run the compiler itself in all supported platforms.
 
-The 'sharkg' and 'sharkglink' commands here can be replaced with 'java -jar bin/sharkc.jar _' (notice the underscore) and 'java -jar bin/sharklink.jar _', gcc can be replaced with any standard C99 compiler (incluiding Bellard's Tiny C).
+The 'sharkg' and 'sharkglink' commands here can be replaced with 'java -jar bin/sharkg.jar _' (notice the underscore) and 'java -jar bin/sharkglink.jar _', gcc can be replaced with any standard C99 compiler (incluiding Bellard's Tiny C).
 
 First run 'sharkg' and 'sharkglink' without arguments to see their syntax.
 
 To build the compiler as a native executable use the following:
 
 > sharkg c sharkg.shg out.c include
+
 > gcc out.c lib/shark.c lib/shark_system.c lib/shark_main.c -Ilib -o test
+
 > test
 
 To build as a java executable use:
 
 > sharkg java sharkg.shg out.java include
+
 > sharkglink out.java Main.java lib/sharkgsystem.java
+
 > mkdir classes
+
 > javac -d classes Main.java
+
 > java -cp classes Main
 
 The final file (passed to the java compiler) must be named Main.java and live under no package (root).
@@ -178,15 +184,16 @@ The final file (passed to the java compiler) must be named Main.java and live un
 To build as a python program use:
 
 > sharkg py sharkg.shg out.py include
+
 > sharkglink out.py sharkg.py lib/sharkgsystem.py
+
 > python sharkg.py
 
 To build as a lua program use:
 
 > sharkg lua sharkg.shg out.lua include
-> sharkglink out.lua sharkg.lua lib/sharkgsystem.lua
 
-Lua programs depends in 'lib/sharkgrt.lua' so copy it to the same folder as your program. Then run:
+> sharkglink out.lua sharkg.lua lib/sharkgrt.lua lib/sharkgsystem.lua
 
 > lua sharkg.lua
 
@@ -393,6 +400,7 @@ Building a game using the sharkgame library is not hard. All games should have a
 You can build a game for HTML5 using:
 
 > sharkg js demo/tetris/src/main.shg out.js
+
 > sharkglink js out.js demo/tetris/game.js lib/sharkgsystem.js lib/sharkgame.js
 
 The game code must be stored in the file 'game.js' so the template html file can find it (you can use any name really, and custom html files).
@@ -401,6 +409,7 @@ Copy the file 'lib/index.html' to 'demo/tetris/index.html' and launch the result
 Building for java goes:
 
 > sharkg java demo/rotozoomer/main.shg out.java
+
 > sharkglink java out.java Main.java lib/sharkgsystem.java lib/sharkgame.java
 
 Now build a .jar using a standard java compiler and place it alongside the /asset directory and you have a working java game.
@@ -408,7 +417,8 @@ Now build a .jar using a standard java compiler and place it alongside the /asse
 Building native games (requires SDL2 and SDL2_ttf installed):
 
 > sharkg c demo/tetris/src/main.shg out.c
-> gcc out.c lib/shark.c lib/shark_system.c lib/shark_game.c -Ilib -o demo/tetris/tetris -lSDL2 -lSDL2_ttf
+
+> gcc out.c lib/shark.c lib/shark_system.c lib/shark_game.c -Ilib -w -o demo/tetris/tetris `pkg-config --libs --cflags SDL2 SDL2_ttf`
 
 ## Implementation Details
 
@@ -466,8 +476,7 @@ function main(args: [] str)
 * The standard library (of both Shark and SharkG) is not fully implemented in JavaScript due to it having no standard I/O, thus this is the only platform that can't bootstrap the shark compilers out of the box. This does not means the shark compilers can't run in javascript, it is possible to use the compilers even in the browser by implementing a fake I/O stream using strings.
 * None of the system/path.api functions is implemented in lua due to it having (almost) no filesystem API. The only API calls that can be implemented without using third parties are rmdir and unlink.
 * The ctoi and itoc functions of the SharkG standard library are not implemented in python, where converting a character to its unicode code point is so painfully slow it renders any algorithm unusable.
-* Bitwise operators (~ | & ^ << >>) are not implemented in lua. Using them will not show a compilation error, but a runtime error when running the resulting lua code.
-* The array types in SharkG are provided for simple use cases. Nested arrays (matrixes) are not a standard feature of the language (very experimental/unstable) and should not be used in portable code. The SharkG standard library does not provides array slicing or copying functions. As a result, intensive array/matrix compute should not be implemented directly in SharkG.
+* The bitwise operators (~ | & ^ << >>) of SharkG are not implemented in lua. Using them will not show a compilation error, but a runtime error when running the resulting lua code.
 
 ## Next Steps
 

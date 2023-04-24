@@ -1,10 +1,14 @@
 
 mkdir temp
 javac -d temp -sourcepath jshark jshark/shark/Shark.java
-jar cfe bin/jshark.jar shark.Shark -C temp *
+cd temp
+jar cfe ../bin/jshark.jar shark.Shark *
+cd ../
 rmdir /S /Q temp
 
 mkdir temp
 javac -d temp -sourcepath jshark jshark/GameShark.java
-jar cfe bin/jgameshark.jar GameShark -C temp *
+cd temp
+jar cfe ../bin/jgameshark.jar GameShark *
+cd ../
 rmdir /S /Q temp

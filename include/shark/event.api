@@ -25,10 +25,21 @@
 ################################################################################
 
 # numeric constant codes for input event types
+# see the prototype of 'event' in shark/main.api
+
+# no event
+# never used in practice
 var E_NONE: int
+
+# signals pressing, moving and releasing of the single touch display/mouse
+# when recieving one of these, the 'x' and 'y' arguments are the absolute screen location of the event
 var E_PRESS: int
 var E_MOVE: int
 var E_RELEASE: int
+
+# signals pressing and releasing analogic buttons
+# UP, DOWN, LEFT and RIGHT are the D-Pad
+# X and Y are usually the Accept and Cancel buttons (but you can use them for whatever you want)
 var E_PRESS_UP: int
 var E_PRESS_DOWN: int
 var E_PRESS_LEFT: int
@@ -41,3 +52,7 @@ var E_REL_LEFT: int
 var E_REL_RIGHT: int
 var E_REL_X: int
 var E_REL_Y: int
+
+# NOTE: It's important (unless you're making a game for certain platforms only) that
+# a game can interact with the user using both the touch screen and analogic buttons
+# as some platforms will only provide one of the two.

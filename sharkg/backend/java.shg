@@ -421,21 +421,21 @@ class shark_backend_java
         self.call_stack.push(self.exp_left)
         self.push()
     
-    function inc_index(op: str)
+    function inc_index(op: str, type: shark_type)
         self.buf.write(self.exp_left)
-        self.buf.write("[(int)")
+        self.buf.write("[(int) (")
         self.buf.write(self.exp)
-        self.buf.write("]")
+        self.buf.write(")]")
         self.buf.write(op)
         self.exp_left = cast(self.call_stack.pop(), str)
         self.exp_base = cast(self.call_stack.pop(), str)
         self.exp = self.buf.get()
     
-    function set_index(op: str)
+    function set_index(op: str, type: shark_type)
         self.buf.write(self.exp_base)
-        self.buf.write("[(int)")
+        self.buf.write("[(int) (")
         self.buf.write(self.exp_left)
-        self.buf.write("]")
+        self.buf.write(")]")
         self.buf.write(op)
         self.buf.write(self.exp)
         self.exp_left = cast(self.call_stack.pop(), str)
@@ -443,11 +443,11 @@ class shark_backend_java
         self.exp = self.buf.get()
         self.exit_assign()
     
-    function get_index()
+    function get_index(type: shark_type)
         self.buf.write(self.exp_left)
-        self.buf.write("[(int)")
+        self.buf.write("[(int) (")
         self.buf.write(self.exp)
-        self.buf.write("]")
+        self.buf.write(")]")
         self.exp_left = cast(self.call_stack.pop(), str)
         self.exp_base = cast(self.call_stack.pop(), str)
         self.exp = self.buf.get()
@@ -555,10 +555,17 @@ class shark_backend_java
     
     function array_new(type: shark_type)
         self.buf.write("new ")
-        self.write_type(cast(type, shark_array_type).type)
-        self.buf.write("[")
+        var base_depth: int = 0
+        var base_type: shark_type = cast(type, shark_array_type).type
+        while instanceof(base_type, shark_array_type) do
+            base_depth += 1
+            base_type = cast(base_type, shark_array_type).type
+        self.write_type(base_type)
+        self.buf.write("[(int) (")
         self.buf.write(self.exp)
-        self.buf.write("]")
+        self.buf.write(")]")
+        for i: int = 0, i < base_depth, i++ do
+            self.buf.write("[0]")
         self.exp = self.buf.get()
     
     function object_new(type: shark_custom_type)

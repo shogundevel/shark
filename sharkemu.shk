@@ -63,7 +63,7 @@ function main(args)
         puts("\tCompiles and executes <filename> using software emulation.\n")
         puts("Do you want to enter sharkemu in eval mode (enter any text to cancel, just hit enter without typing to accept)? ")
         var r = read_line()
-        if r != "" and r != "\n" and r != "\r" and r != "\n\r" then
+        if r != "" and r != "\n" and r != "\r" and r != "\r\n" then
             return
         play()
     else
