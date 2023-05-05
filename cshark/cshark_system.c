@@ -49,6 +49,7 @@
         #include <unistd.h>
         #include <dirent.h>
     #endif
+    #include <process.h>
 #endif
 
 #define SHARK_NATIVE(name)     static shark_value shark_lib_ ## name(shark_vm *vm, shark_value *args, shark_error *error)
@@ -109,10 +110,11 @@ SHARK_NATIVE(error)
 {
     SHARK_ASSERT_STR(args[0], vm, "argument 1 of 'error'");
     shark_string *message = SHARK_AS_STR(args[0]);
-    if (error->protect)
+    if (error->protect) {
         error->message = message;
-    else
+    } else {
         shark_fatal_error(vm, message->data);
+    }
     return SHARK_NULL;
 }
 
@@ -203,6 +205,12 @@ SHARK_NATIVE(path_join)
 }
 
 #ifndef CSHARK_NO_FS
+SHARK_NATIVE(system)
+{
+    SHARK_ASSERT_STR(args[0], vm, "argument 1 of 'system'");
+    return SHARK_FROM_INT(system(SHARK_AS_STR(args[0])->data));
+}
+
 SHARK_NATIVE(listdir)
 {
     SHARK_ASSERT_STR(args[0], vm, "argument 1 of 'listdir'");
@@ -1459,6 +1467,10 @@ SHARK_API void shark_init_library(shark_vm *vm, shark_string *library_path)
     function->code.native_code = shark_lib_path_join;
 
 #ifndef CSHARK_NO_FS
+    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "system"));
+    function->type = SHARK_NATIVE_FUNCTION;
+    function->code.native_code = shark_lib_system;
+    
     function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "listdir"));
     function->type = SHARK_NATIVE_FUNCTION;
     function->code.native_code = shark_lib_listdir;

@@ -108,8 +108,8 @@ function generate_piece_data()
             piece_line(true, false, false, false),
             null
         ), piece_block(
+            piece_line(true, false, false, false),
             piece_line(true, true, true, false),
-            piece_line(false, false, true, false),
             null, null
         ), piece_block(
             piece_line(false, true, false, false),
@@ -117,8 +117,8 @@ function generate_piece_data()
             piece_line(true, true, false, false),
             null
         ), piece_block(
-            piece_line(true, false, false, false),
             piece_line(true, true, true, false),
+            piece_line(false, false, true, false),
             null, null
         )
     )
@@ -129,8 +129,8 @@ function generate_piece_data()
             piece_line(false, true, false, false),
             null
         ), piece_block(
-            piece_line(false, false, true, false),
             piece_line(true, true, true, false),
+            piece_line(true, false, false, false),
             null, null
         ), piece_block(
             piece_line(true, false, false, false),
@@ -138,8 +138,8 @@ function generate_piece_data()
             piece_line(true, true, false, false),
             null
         ), piece_block(
+            piece_line(false, false, true, false),
             piece_line(true, true, true, false),
-            piece_line(true, false, false, false),
             null, null
         )
     )
@@ -149,18 +149,18 @@ function generate_piece_data()
             piece_line(true, true, true, false),
             null, null
         ), piece_block(
-            piece_line(true, false, false, false),
+            piece_line(false, true, false, false),
             piece_line(true, true, false, false),
-            piece_line(true, false, false, false),
+            piece_line(false, true, false, false),
             null
         ), piece_block(
             piece_line(true, true, true, false),
             piece_line(false, true, false, false),
             null, null
         ), piece_block(
-            piece_line(false, true, false, false),
+            piece_line(true, false, false, false),
             piece_line(true, true, false, false),
-            piece_line(false, true, false, false),
+            piece_line(true, false, false, false),
             null
         )
     )
@@ -199,6 +199,7 @@ function launch()
 function new_piece()
 
 function new_game()
+    line_data = line_data # fixup
     if line_data != null then
         for x: int = 0, x < W, x++ do
             free(line_data[x])
@@ -219,7 +220,10 @@ function new_game()
 function collision() -> bool
 
 function new_piece()
+    next_piece = next_piece # fixup
+    next_rotation = next_rotation # fixup
     current_piece = piece_base[next_piece]
+    current_rotation = next_rotation
     piece_data = current_piece[next_rotation]
     next_piece = random(sizeof(piece_base))
     next_rotation = random(4)
@@ -229,9 +233,34 @@ function new_piece()
         new_game()
 
 function rotate()
+function move(dx: int, dy: int) -> bool
+
+var touch_w: bool = false
+var touch_x: int = 0
+var touch_y: int = 0
 
 function event(type: int, x: int, y: int)
-    if type == E_PRESS_LEFT then
+    if type == E_PRESS then
+        touch_w = true
+        touch_x = x
+        touch_y = y
+    else if type == E_RELEASE then
+        if touch_x == x and touch_y == y then
+            rotate()
+        touch_w = false
+    else if type == E_MOVE and touch_w then
+        var move_x: int = x - touch_x
+        var move_y: int = y - touch_y
+        if move_x < -16 then
+            move(-1, 0)
+            touch_x -= 16
+        else if move_x > 16 then
+            move(1, 0)
+            touch_x += 16
+        else if move_y > 16 then
+            move(0, 1)
+            touch_y += 16
+    else if type == E_PRESS_LEFT then
         left_down = true
         event_time = EVENT_MAX
     else if type == E_PRESS_RIGHT then
@@ -248,7 +277,6 @@ function event(type: int, x: int, y: int)
     else if type == E_REL_UP then
         rotate()
 
-function move(dx: int, dy: int) -> bool
 function advance()
 
 function update()
@@ -287,6 +315,9 @@ function move(dx: int, dy: int) -> bool
         return true
 
 function rotate()
+    current_rotation = current_rotation # fixup
+    piece_data = piece_data # fixup
+    
     var prev_rotation: int = current_rotation
     var prev_piece_data: [][] bool = piece_data
     

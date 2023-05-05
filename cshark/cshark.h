@@ -317,7 +317,7 @@ typedef struct {
     shark_value *data;
 } shark_array;
 
-#define SHARK_ARRAY_INIT_SIZE       4
+#define SHARK_ARRAY_INIT_SIZE       2
 #define SHARK_ARRAY_GROW_SIZE(x)    (x << 1)
 #define SHARK_ARRAY_SHRINK_SIZE(x)  (x >> 1)
 
@@ -343,7 +343,7 @@ struct shark_table
     shark_table_slot *data;
 };
 
-#define SHARK_TABLE_INIT_SIZE       8
+#define SHARK_TABLE_INIT_SIZE       4
 
 #define SHARK_TABLE_HASH_NULL       0
 #define SHARK_TABLE_HASH_NOT_NULL   1

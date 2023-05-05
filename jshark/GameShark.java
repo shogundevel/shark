@@ -85,7 +85,8 @@ public class GameShark {
 		public void draw_text(String text, SharkFont font, int x, int y)
 		{
 			screen.setFont(font.font);
-			screen.drawString(text, x, y);
+            screen.setColor(font.color);
+			screen.drawString(text, x, y + screen.getFontMetrics(font.font).getAscent());
 		}
 	}
 	
@@ -115,15 +116,20 @@ public class GameShark {
 	{
 		int height;
 		Font font;
+        Color color;
 		
 		public SharkFont() {
 			type = FONT_CLASS;
 		}
 		
-		public void init(String name, int height) throws Exception
+		public void init(String name, int height, int color_code) throws Exception
 		{
 			this.height = height;
 			font = Font.createFont(Font.TRUETYPE_FONT, new File (Standard.path_join(asset_path, name))).deriveFont((float) height);
+            color = new Color ((color_code >> 24) & 0xFF,
+                        (color_code >> 16) & 0xFF,
+                        (color_code >> 8) & 0xFF,
+                        (color_code) & 0xFF);
 		}
 	}
 	
@@ -312,7 +318,7 @@ public class GameShark {
 				public Object call(VirtualMachine caller) throws RuntimeError {
 					SharkFont font = new SharkFont ();
                     try {
-                        font.init((String) caller.stack[caller.TOS-3], (int) (double) caller.stack[caller.TOS-2]);
+                        font.init((String) caller.stack[caller.TOS-3], (int) (double) caller.stack[caller.TOS-2], (int) (double) caller.stack[caller.TOS-1]);
                         return font;
                     } catch (Exception e) {
                         Standard.set_err(1000);

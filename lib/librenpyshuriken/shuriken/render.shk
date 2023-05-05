@@ -1,0 +1,84 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import pygame
+import system.math: floor
+
+var renpy
+var tuple
+
+class render
+    function __init__(render)
+        self.render = render
+    
+    function draw(object, x, y)
+        self.render.blit(object.render, tuple([x, y]))
+    
+    function get_size_x()
+        return self.render.get_size()[0]
+    
+    function get_size_y()
+        return self.render.get_size()[1]
+
+var ctext
+var tuple
+var Color
+var zero = tuple([0, 0])
+
+class font
+    function __init__(font, size)
+        self.font = font
+        self.size = size
+    
+    function get_height()
+        return self.size
+    
+    function get_size()
+        return null
+
+
+function color(r, g, b, a)
+    return (r * (0xFFFFFF + 1) + g * (0xFFFF + 1) + b * (0xFF + 1) + a)
+
+function render_solid(color, size_x, size_y)
+    var surf = new renpy::Render(size_x, size_y)
+    surf.canvas().get_surface().fill(new pygame::Color(
+        floor(color / (0xFFFFFF + 1)) % (0xFF + 1),
+        floor(color / (0xFFFF + 1)) % (0xFF + 1),
+        floor(color / (0xFF + 1)) % (0xFF + 1),
+        color % (0xFF + 1)
+    ))
+    return new render (surf)
+
+var hex
+
+function render_text(text, font, color)
+    var text_object = ctext(text, font.font, font.size, "#%.8x" % color)
+    var text_render = text_object.render(1280, font.size, 0, 0)
+    var rect_size = text_object.size()
+    var rect_render = renpy.Render(rect_size[0], rect_size[1])
+    rect_render.blit(text_render, zero)
+    return new render (rect_render)

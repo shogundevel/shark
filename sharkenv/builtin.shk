@@ -48,6 +48,12 @@ function unlink(args)
         return
     path::unlink(args[1])
 
+function system(args)
+    if sizeof(args) <= 1 then
+        puts("usage: system <command> <args>\n\texecutes <command> in the host system command line interface\n")
+        return
+    path::system(string::join(" ", util::slice(args, 1, sizeof(args))))
+
 function exit(args)
     libexit::exit(libexit::SUCCESS)
 
@@ -64,9 +70,9 @@ function install(args)
     if source == null then
         printf("can't open input file '%'.", [origin])
         return
-    var libs = path::join(base, "libs")
-    path::mkdir(libs)
-    var install_path = path::join(libs, path::get_tail(origin))
+    var lib = path::join(base, "lib")
+    path::mkdir(lib)
+    var install_path = path::join(lib, path::get_tail(origin))
     var output = open(install_path, "wb")
     while not source.at_end() do
         output.puts(source.read(256))

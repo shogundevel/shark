@@ -1,0 +1,96 @@
+
+var display = null;
+var display_scale_x = 1.0;
+var display_scale_y = 1.0;
+
+function OnStart()
+{
+    app.SetOrientation("Landscape");
+    var layout = app.CreateLayout("Linear");
+    display = app.CreateImage(null, 1, 1, "alias", 320, 192)
+    display_scale_x = app.GetDisplayWidth() / 320;
+    display_scale_y = app.GetDisplayHeight() / 192;
+    display.SetTextSize(12 * display_scale_x);
+    display.SetPaintColor("#FF000000");
+    // image.SetOnTouch(touch_callback)
+    display.SetAutoUpdate(false)
+    layout.AddChild(display)
+    app.AddLayout(layout)
+    
+    launch();
+    
+    function update_game()
+    {
+        update();
+        render();
+        display.Update();
+    }
+    
+    app.Animate(update_game, 24);
+}
+
+function texture(image_data) {
+    this.image_data = image_data;
+}
+
+texture.prototype.get_size_x = function () {
+    return this.image_data.GetWidth();
+}
+
+texture.prototype.get_size_y = function () {
+    return this.image_data.GetHeight();
+}
+
+function font(size, color)
+{
+    this.size = size;
+    this.color = color;
+}
+
+font.prototype.get_height = function () {
+    return this.size;
+}
+
+function get_save_file(mode) {
+    return null;
+}
+
+var E_NONE = 0;
+var E_PRESS = 1;
+var E_MOVE = 2;
+var E_RELEASE = 3;
+var E_PRESS_UP = 4;
+var E_PRESS_DOWN = 5;
+var E_PRESS_LEFT = 6;
+var E_PRESS_RIGHT = 7;
+var E_PRESS_X = 8;
+var E_PRESS_Y = 9;
+var E_REL_UP = 10;
+var E_REL_DOWN = 11;
+var E_REL_LEFT = 12;
+var E_REL_RIGHT = 13;
+var E_REL_X = 14;
+var E_REL_Y = 15;
+
+var ERR_ASSET_NOT_FOUND = 1000;
+
+function load_texture(name) {
+    return new texture (app.CreateImage("asset/" + name));
+}
+
+function load_font(name, size, color) {
+    return new font (size, color);
+}
+
+function draw(text, x, y) {
+    display.DrawImage(text.image_data, (x != 0 ? 1 / (320 / x) : 0), (y != 0 ? 1 / (192 / y) : 0),
+    text.image_data.GetWidth() * display_scale_x, text.image_data.GetHeight() * display_scale_y);
+}
+
+function draw_ex(t, x, y, ox, oy, r, sx, xy) {
+    throw "draw_ex not implemented";
+}
+
+function draw_text(text, font, x, y) {
+    display.DrawText(text, (x != 0 ? 1 / (320 / x) : 0), (y != 0 ? 1 / (192 / (y + 12)) : 0));
+}

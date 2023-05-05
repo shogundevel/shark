@@ -125,6 +125,7 @@ class python_generator
         self.out = open(out, "w")
         if self.out == null then
             compiler_error(format("can't open file '%' for writing, compilation aborted.", [out_filename]))
+        self.out.printf("__MAIN__ = '%'\n", [path::remove_ext(path::get_tail(filename))])
         self.enter_module(path::remove_ext(path::get_tail(filename)))
     
     function enter_module(import_path)

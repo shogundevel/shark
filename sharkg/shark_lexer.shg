@@ -1,0 +1,376 @@
+###############################################################################
+### Copyright #################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+###############################################################################
+
+import "shark_lexer.api"
+
+class shark_token
+    function shark_token(lineno: int, type: str, value: str)
+        self.lineno = lineno
+        self.type = type
+        self.value = value
+
+var shark_lexer_keywords_list: [] str = null
+var shark_lexer_keywords_map: strmap = null
+
+function shark_lexer_init_keywords()
+    shark_lexer_keywords_map = shark_lexer_keywords_map
+    if shark_lexer_keywords_map == null then
+        shark_lexer_keywords_list = new [35] str
+        shark_lexer_keywords_list[0] = "import"
+        shark_lexer_keywords_list[1] = "define"
+        shark_lexer_keywords_list[2] = "class"
+        shark_lexer_keywords_list[3] = "var"
+        shark_lexer_keywords_list[4] = "function"
+        shark_lexer_keywords_list[5] = "bool"
+        shark_lexer_keywords_list[6] = "int"
+        shark_lexer_keywords_list[7] = "float"
+        shark_lexer_keywords_list[8] = "char"
+        shark_lexer_keywords_list[9] = "str"
+        shark_lexer_keywords_list[10] = "object"
+        shark_lexer_keywords_list[11] = "if"
+        shark_lexer_keywords_list[12] = "then"
+        shark_lexer_keywords_list[13] = "else"
+        shark_lexer_keywords_list[14] = "select"
+        shark_lexer_keywords_list[15] = "case"
+        shark_lexer_keywords_list[16] = "while"
+        shark_lexer_keywords_list[17] = "do"
+        shark_lexer_keywords_list[18] = "for"
+        shark_lexer_keywords_list[19] = "in"
+        shark_lexer_keywords_list[20] = "break"
+        shark_lexer_keywords_list[21] = "continue"
+        shark_lexer_keywords_list[22] = "return"
+        shark_lexer_keywords_list[23] = "and"
+        shark_lexer_keywords_list[24] = "or"
+        shark_lexer_keywords_list[25] = "not"
+        shark_lexer_keywords_list[26] = "self"
+        shark_lexer_keywords_list[27] = "sizeof"
+        shark_lexer_keywords_list[28] = "new"
+        shark_lexer_keywords_list[29] = "instanceof"
+        shark_lexer_keywords_list[30] = "cast"
+        shark_lexer_keywords_list[31] = "null"
+        shark_lexer_keywords_list[32] = "true"
+        shark_lexer_keywords_list[33] = "false"
+        shark_lexer_keywords_list[34] = "inline"
+        
+        shark_lexer_keywords_map = new strmap ()
+        for i: int = 0, i < sizeof(shark_lexer_keywords_list), i++ do
+            shark_lexer_keywords_map.set(shark_lexer_keywords_list[i], i)
+
+class shark_lexer
+    function shark_lexer(filename: str, source: FILE)
+        shark_lexer_init_keywords()
+        self.filename = filename
+        self.source = source
+        self.lineno = 1
+        self.current_char = '\0'
+        self.next()
+        self.token = new shark_token (0, null, null)
+        self.buffer = new strbuf ()
+        self.indent_token = new shark_token (0, "indent", "indent")
+        self.dedent_token = new shark_token (0, "dedent", "dedent")
+        self.indent_stack = new [256] int
+        self.indent_depth = 1
+        self.indent_level = 0
+        self.indent_stack[0] = self.indent_level
+        self.dedent_count = 0
+        self.post_indent = false
+        self.delimiter_count = 0
+        self.empty_line = true
+    
+    function error(message: str)
+        write("[error] file '")
+        write(self.filename)
+        write("', line ")
+        write(itos(self.lineno))
+        write(": ")
+        write(message)
+        write("\n")
+        exit(EXIT_FAILURE)
+    
+    function emit(type: str, value: str) -> shark_token
+        self.token.lineno = self.lineno
+        self.token.type = type
+        self.token.value = value
+        if self.empty_line then
+            self.empty_line = false
+            if self.delimiter_count == 0 then
+                var indent: shark_token = self.indent()
+                if indent != null then
+                    return indent
+        return self.token
+    
+    function indent() -> shark_token
+        var indent_level: int = self.indent_stack[self.indent_depth - 1]
+        if self.indent_level > indent_level then
+            self.indent_stack[self.indent_depth] = self.indent_level
+            self.indent_depth++
+            if self.indent_depth == 255 then
+                self.error("max indentation depth reached.")
+            return self.emit_indent()
+        else if self.indent_level == indent_level then
+            return null
+        else
+            while self.indent_level < indent_level do
+                self.dedent_count += 1
+                self.indent_depth -= 1
+                indent_level = self.indent_stack[self.indent_depth - 1]
+            if self.indent_level != indent_level then
+                self.error("inconsistent indentation")
+            return self.emit_dedent()
+    
+    function emit_indent() -> shark_token
+        self.post_indent = true
+        self.indent_token.lineno = self.lineno
+        return self.indent_token
+    
+    function emit_dedent() -> shark_token
+        self.post_indent = true
+        self.dedent_count -= 1
+        self.dedent_token.lineno = self.lineno
+        return self.dedent_token
+    
+    function next() -> char
+        var value: char = self.current_char
+        if self.source.at_end() then
+            self.current_char = '\0'
+        else
+            self.current_char = self.source.fetch()
+            if self.current_char == '\0' then
+                self.error("unexpected null character.")
+        return value
+    
+    function match(value: char) -> bool
+        if self.current_char == value then
+            self.next()
+            return true
+        else
+            return false
+    
+    function skip_until(c: char, consume: bool)
+        while self.current_char != c do
+            if self.current_char == '\n' then
+                self.lineno++
+            else if self.current_char == '\0' then
+                return
+            self.next()
+        if consume then
+            self.next()
+    
+    function escape() -> char
+        var c: char = self.next()
+        if (c == '0' or c == 'r'
+        or c == 'n' or c == 't'
+        or c == '\\' or c == '"'
+        or c == '\'') then
+            return c
+        else
+            self.error("invalid escape sequence.")
+            return '\0'
+    
+    function scan_name() -> shark_token
+        while isident(self.current_char) do
+            self.buffer.put(self.next())
+        var value: str = self.buffer.get()
+        if shark_lexer_keywords_map.has(value) then
+            return self.emit("keyword", shark_lexer_keywords_list[shark_lexer_keywords_map.get(value)])
+        else
+            return self.emit("name", value)
+    
+    function scan_number(start: char) -> shark_token
+        self.buffer.put(start)
+        if start == '0' and isdigit(self.current_char) then
+            self.error("unexpected digit character after zero.")
+        while isdigit(self.current_char) do
+            self.buffer.put(self.next())
+        if self.match('.') then
+            self.buffer.put('.')
+            if not isdigit(self.current_char) then
+                self.error("expected at least one digit after dot.")
+            self.buffer.put(self.next())
+            while isdigit(self.current_char) do
+                self.buffer.put(self.next())
+            return self.emit("float", self.buffer.get())
+        return self.emit("int", self.buffer.get())
+    
+    function scan() -> shark_token
+        if self.dedent_count > 0 then
+            return self.emit_dedent()
+        else if self.post_indent then
+            self.post_indent = false
+            return self.token
+        for ,, do
+            var c: char = self.next()
+            if c == ' ' or c == '\t' or c == '\r' then
+                continue
+            else if c == '\n' then
+                self.indent_level = 0
+                while self.match(' ') do
+                    self.indent_level += 1
+                var newline: shark_token = null
+                if not self.empty_line and self.delimiter_count == 0 then
+                    newline = self.emit("newline", "newline")
+                self.lineno += 1
+                self.empty_line = true
+                if newline != null then
+                    return newline
+                else
+                    continue
+            else if c == '\0' then
+                self.indent_level = 0
+                var indent: shark_token = self.indent()
+                self.emit("EOF", null)
+                if indent != null then
+                    return indent
+                else
+                    return self.token
+            else if c == '#' then
+                self.skip_until('\n', false)
+            else if c == ':' then
+                return self.emit("delimiter", ":")
+            else if c == ';' then
+                return self.emit("delimiter", ";")
+            else if c == '.' then
+                return self.emit("delimiter", ".")
+            else if c == ',' then
+                return self.emit("delimiter", ",")
+            else if c == '[' then
+                self.delimiter_count += 1
+                return self.emit("delimiter", "[")
+            else if c == ']' then
+                self.delimiter_count -= 1
+                return self.emit("delimiter", "]")
+            else if c == '{' then
+                self.delimiter_count += 1
+                return self.emit("delimiter", "{")
+            else if c == '}' then
+                self.delimiter_count -= 1
+                return self.emit("delimiter", "}")
+            else if c == '(' then
+                self.delimiter_count += 1
+                return self.emit("delimiter", "(")
+            else if c == ')' then
+                self.delimiter_count -= 1
+                return self.emit("delimiter", ")")
+            else if c == '*' then
+                if self.match('=') then
+                    return self.emit("assign", "*=")
+                else
+                    return self.emit("operator", "*")
+            else if c == '/' then
+                if self.match('=') then
+                    return self.emit("assign", "/=")
+                else
+                    return self.emit("operator", "/")
+            else if c == '%' then
+                if self.match('=') then
+                    return self.emit("assign", "%=")
+                else
+                    return self.emit("operator", "%")
+            else if c == '+' then
+                if self.match('+') then
+                    return self.emit("operator", "++")
+                else if self.match('=') then
+                    return self.emit("assign", "+=")
+                else
+                    return self.emit("operator", "+")
+            else if c == '-' then
+                if isdigit(self.current_char) then
+                    self.buffer.put('-')
+                    return self.scan_number(self.next())
+                else if self.match('>') then
+                    return self.emit("delimiter", "->")
+                else if self.match('-') then
+                    return self.emit("operator", "--")
+                else if self.match('=') then
+                    return self.emit("assign", "-=")
+                else
+                    return self.emit("operator", "-")
+            else if c == '<' then
+                if self.match('=') then
+                    return self.emit("operator", "<=")
+                else if self.match('<') then
+                    return self.emit("operator", "<<")
+                else
+                    return self.emit("operator", "<")
+            else if c == '>' then
+                if self.match('=') then
+                    return self.emit("operator", ">=")
+                else if self.match('>') then
+                    return self.emit("operator", ">>")
+                else
+                    return self.emit("operator", ">")
+            else if c == '=' then
+                if self.match('=') then
+                    return self.emit("operator", "==")
+                else
+                    return self.emit("assign", "=")
+            else if c == '!' then
+                if self.match('=') then
+                    return self.emit("operator", "!=")
+                else
+                    return self.emit("operator", "!")
+            else if c == '~' then
+                return self.emit("operator", "~")
+            else if c == '&' then
+                return self.emit("operator", "&")
+            else if c == '|' then
+                return self.emit("operator", "|")
+            else if c == '^' then
+                return self.emit("operator", "^")
+            else if c == '"' then
+                self.buffer.put('"')
+                while not self.match('"') do
+                    var c2: char = self.next()
+                    self.buffer.put(c2)
+                    if c2 == '\\' then
+                        self.buffer.put(self.escape())
+                    else if c2 == '\n' then
+                        self.error("unexpected EOL while scanning string literal.")
+                self.buffer.put('"')
+                return self.emit("str", self.buffer.get())
+            else if c == '\'' then
+                self.buffer.put('\'')
+                if self.match('\\') then
+                    self.buffer.put('\\')
+                    self.buffer.put(self.escape())
+                else if self.match('\'') then
+                    self.error("expected at least one character in char literal (try escaping the quote with \\).")
+                else if self.match('\n') then
+                    self.error("unexpected EOL while scanning character literal.")
+                else
+                    self.buffer.put(self.next())
+                if not self.match('\'') then
+                    self.error("expected a quote to close character literal.")
+                self.buffer.put('\'')
+                return self.emit("char", self.buffer.get())
+            else
+                if isalpha(c) or c == '_' then
+                    self.buffer.put(c)
+                    return self.scan_name()
+                else if isdigit(c) then
+                    return self.scan_number(c)
+                else
+                    self.error("invalid character.")

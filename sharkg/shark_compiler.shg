@@ -1,0 +1,1047 @@
+###############################################################################
+### Copyright #################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+###############################################################################
+
+import "system/io.api"
+import "shark_compiler.api"
+
+var shark_compiler_op_priority: strmap = null
+
+function shark_compiler_init()
+    shark_compiler_op_priority = new strmap ()
+    shark_compiler_op_priority.set("or", 1)
+    shark_compiler_op_priority.set("and", 2)
+    shark_compiler_op_priority.set("&", 3)
+    shark_compiler_op_priority.set("|", 3)
+    shark_compiler_op_priority.set("^", 3)
+    shark_compiler_op_priority.set("<<", 4)
+    shark_compiler_op_priority.set(">>", 4)
+    shark_compiler_op_priority.set("==", 5)
+    shark_compiler_op_priority.set("!=", 5)
+    shark_compiler_op_priority.set("<", 6)
+    shark_compiler_op_priority.set("<=", 6)
+    shark_compiler_op_priority.set(">", 6)
+    shark_compiler_op_priority.set(">=", 6)
+    shark_compiler_op_priority.set("+", 7)
+    shark_compiler_op_priority.set("-", 7)
+    shark_compiler_op_priority.set("*", 8)
+    shark_compiler_op_priority.set("/", 8)
+    shark_compiler_op_priority.set("%", 8)
+    
+    shark_basic_type_void = new shark_type ()
+    shark_basic_type_bool = new shark_basic_type ("bool")
+    shark_basic_type_int = new shark_basic_type ("int")
+    shark_basic_type_float = new shark_basic_type ("float")
+    shark_basic_type_char = new shark_basic_type ("char")
+    shark_basic_type_str = new shark_basic_type ("str")
+    shark_basic_type_any = new shark_basic_any_type ()
+    
+    shark_compiler_basic_types = new shark_namespace (null)
+    shark_compiler_basic_types.add("bool", shark_basic_type_bool)
+    shark_compiler_basic_types.add("int", shark_basic_type_int)
+    shark_compiler_basic_types.add("float", shark_basic_type_float)
+    shark_compiler_basic_types.add("char", shark_basic_type_char)
+    shark_compiler_basic_types.add("str", shark_basic_type_str)
+    shark_compiler_basic_types.add("object", shark_basic_type_any)
+
+class shark_compiler
+    function shark_compiler()
+        shark_compiler_init()
+        self.import_record = new strmap()
+        self.namespace = new shark_namespace(null)
+        self.source_context = null
+        self.lexer = null
+        self.token = null
+        self.errbuf = null
+        self.callee = null
+    
+    function compile(filename: str, include: list, backend: shark_backend, out: str)
+        self.include = include
+        self.backend = backend
+        self.backend.begin(out)
+        
+        var source: FILE = open(filename, 'r')
+        
+        if source == null then
+            self.write_error("can't open input file '")
+            self.write_error(filename)
+            self.write_error("' for reading, compilation aborted.")
+            self.error()
+        
+        self.import_record = new strmap ()
+        self.namespace = new shark_namespace (null)
+        self.source_context = filename
+        self.lexer = new shark_lexer (filename, source)
+        self.token = self.lexer.scan()
+        
+        self.type_context = null
+        self.function_context = null
+        self.context = null
+        
+        self.in_type = false
+        self.in_impl = false
+        self.in_function = false
+        self.in_loop = false
+        self.assign_target = false
+        self.else_if = false
+        
+        self.source_file()
+        self.backend.close()
+    
+    function write_error(data: str)
+        if self.errbuf == null then
+            self.errbuf = new strbuf()
+            self.errbuf.write("[error] ")
+            if self.source_context != null then
+                self.errbuf.write("File '")
+                self.errbuf.write(self.source_context)
+                self.errbuf.write("', line ")
+                self.errbuf.write(itos(self.token.lineno))
+                self.errbuf.write(": ")
+        self.errbuf.write(data)
+    
+    function error()
+        write(self.errbuf.get())
+        exit(EXIT_FAILURE)
+    
+    function next() -> str
+        var value: str = self.token.value
+        self.token = self.lexer.scan()
+        return value
+    
+    function match(value: str) -> bool
+        if self.token.value == value then
+            self.next()
+            return true
+        else
+            return false
+    
+    function consume(type: str) -> str
+        if self.token.type != type then
+            self.write_error("invalid token type, expected '")
+            self.write_error(type)
+            self.write_error("' but got '")
+            self.write_error(self.token.type)
+            self.write_error("'.")
+            self.error()
+        return self.next()
+    
+    function expect(value: str)
+        if not self.match(value) then
+            self.write_error("invalid token, expected '")
+            self.write_error(value)
+            self.write_error("' but got '")
+            self.write_error(self.token.value)
+            self.write_error("'.")
+            self.error()
+    
+    function eol()
+        if self.match(";") then
+            self.seol()
+        else if self.token.type == "newline" then
+            self.next()
+        else
+            self.write_error("expected EOL but got '")
+            self.write_error(self.token.type)
+            self.write_error("' token.")
+            self.error()
+    
+    function seol()
+        if self.token.type == "newline" then
+            self.next()
+    
+    function match_indent() -> bool
+        if self.token.type == "indent" then
+            self.next()
+            return true
+        else
+            return false
+    
+    function match_dedent() -> bool
+        if self.token.type == "dedent" then
+            self.next()
+            return true
+        else
+            return false
+    
+    function indent()
+        if not self.match_indent() then
+            self.write_error("expected an indented block.")
+            self.error()
+    
+    function dedent(lineno: int)
+        if not self.match_dedent() then
+            self.write_error("expected the end of the block (started at line ")
+            self.write_error(itos(lineno))
+            self.write_error(").")
+            self.error()
+    
+    function at_end() -> bool
+        return self.token.type == "EOF"
+    
+    function source_file()
+        while not self.at_end() do
+            if not self.decl() then
+                self.write_error("expected global declaration.")
+                self.error()
+    
+    function decl() -> bool
+        return (self.import_decl() or self.typedef_decl()
+            or self.var_decl() or self.function_decl() or self.inline_stat())
+    
+    function import_decl() -> bool
+        if self.match("import") then
+            var import_path: str = self.import_path()
+            self.eol()
+            if self.import_record.has(import_path) then
+                return true
+            self.import_record.set(import_path, 0)
+            
+            var filename: str = null
+            var source: FILE = null
+            
+            for i: int = 0, i < self.include.size(), i++ do
+                filename = shark_path_join(cast(self.include.get(i), str), import_path)
+                source = open(filename, 'r')
+                if source != null then
+                    break
+            
+            if source == null then
+                self.write_error("can't resolve import '")
+                self.write_error(import_path)
+                self.write_error("'.")
+                self.error()
+            
+            var prev_source_context: str = self.source_context
+            var prev_lexer: shark_lexer = self.lexer
+            var prev_token: shark_token = self.token
+            
+            self.source_context = filename
+            self.lexer = new shark_lexer (filename, source)
+            self.token = self.lexer.scan()
+            
+            self.source_file()
+            
+            self.source_context = prev_source_context
+            self.lexer = prev_lexer
+            self.token = prev_token
+            
+            return true
+        else
+            return false
+    
+    function import_path() -> str
+        var path: str = self.consume("str")
+        var iter: striter = new striter (path)
+        var buf: strbuf = new strbuf ()
+        var size: int = 0
+        
+        iter.next()
+        
+        while not iter.empty() do
+            var c: char = iter.next()
+            if c == '"' then
+                break
+            buf.put(c)
+            size++
+        
+        if size == 0 then
+            self.write_error("empty filename.")
+            self.error()
+        
+        return buf.get()
+    
+    function basic_type() -> shark_type
+        if shark_compiler_basic_types.has(self.token.value) then
+            return cast(shark_compiler_basic_types.get(self.next()), shark_type)
+        else
+            return null
+    
+    function custom_type() -> shark_type
+        if self.token.type != "name" then
+            self.write_error("expected a custom type.")
+            self.error()
+        
+        var type_name: str = self.next()
+        
+        if not self.namespace.has(type_name) then
+            self.write_error("type '")
+            self.write_error(type_name)
+            self.write_error("' is not defined.")
+            self.error()
+        
+        var type: object = self.namespace.get(type_name)
+        
+        if not instanceof(type, shark_custom_type) then
+            self.write_error("name '")
+            self.write_error(type_name)
+            self.write_error("' is not a custom type.")
+            self.error()
+        return cast(type, shark_type)
+    
+    function type() -> shark_type
+        if self.match("[") then
+            self.expect("]")
+            return new shark_array_type (self.type())
+        else
+            var type: shark_type = self.basic_type()
+            if type == null then
+                return self.custom_type()
+            return type
+    
+    function typedef_decl() -> bool
+        if self.match("class") then
+            var name: str = self.consume("name")
+            var parent: shark_custom_type = null
+            var type: shark_custom_type = null
+            self.in_type = true
+            if self.match("(") then
+                self.in_impl = false
+                if not self.match("object") then
+                    parent = cast(self.custom_type(), shark_custom_type)
+                self.expect(")")
+                if self.namespace.has(name) then
+                    self.write_error("name '")
+                    self.write_error(name)
+                    self.write_error("' is already defined.")
+                    self.error()
+                type = new shark_custom_type (name, parent)
+                self.namespace.add(name, type)
+                self.backend.enter_type_decl(type)
+            else
+                self.in_impl = true
+                if not self.namespace.has(name) then
+                    self.write_error("type '")
+                    self.write_error(name)
+                    self.write_error("' is not defined.")
+                    self.error()
+                var proto: object = self.namespace.get(name)
+                if not instanceof(proto, shark_custom_type) then
+                    self.write_error("name '")
+                    self.write_error(name)
+                    self.write_error("' is not a custom type.")
+                    self.error()
+                type = cast(proto, shark_custom_type)
+                if type.implemented then
+                    self.write_error("type '")
+                    self.write_error(type.name)
+                    self.write_error(" is already implemented.")
+                    self.error()
+                self.backend.enter_type_impl(type)
+            self.eol()
+            self.indent()
+            self.type_context = type
+            while not self.match_dedent() do
+                var node: bool = false
+                if not self.in_impl then
+                    node = self.var_decl() or self.function_decl()
+                else
+                    node = self.function_decl()
+                if not node then
+                    self.write_error("expected a declaration in typedef body.")
+                    self.error()
+            if self.in_impl then
+                type.implemented = true
+                self.backend.exit_type_impl()
+            else
+                self.backend.exit_type_decl()
+            self.type_context = null
+            self.in_type = false
+            self.in_impl = false
+            return true
+        else
+            return false
+    
+    function var_decl() -> bool
+        if self.match("var") then
+            var name: str = self.consume("name")
+            self.expect(":")
+            var type: shark_type = self.type()
+            var value: bool = false
+            if self.match("=") then
+                if self.in_function then
+                    value = true
+                    self.exp()
+                else if self.in_type then
+                    self.write_error("type field can't have an static initializer.")
+                    self.error()
+                else
+                    value = self.literal()
+                    if not value then
+                        self.write_error("expected a literal expression.")
+                        self.error()
+            else if self.in_function then
+                self.write_error("local variable declaration should have an initializer.")
+                self.error()
+            if self.in_function then
+                if self.context.has(name) then
+                    self.write_error("name '")
+                    self.write_error(name)
+                    self.write_error(" is defined twice.")
+                    self.error()
+                self.context.add(name, new shark_variable (name, type))
+                if not type.get_cast(self.exp_type) then
+                    self.write_error("invalid initializer type in variable declaration.")
+                    self.error()
+                self.backend.var_decl(name, type)
+            else if self.in_type then
+                if self.type_context.namespace.has(name) then
+                    self.write_error("name '")
+                    self.write_error(name)
+                    self.write_error("' is already defined.")
+                    self.error()
+                var variable: shark_variable = new shark_variable (name, type)
+                self.type_context.namespace.add(name, variable)
+                self.type_context.fields.push(variable)
+                variable.source_type = self.type_context
+            else if value then
+                if self.namespace.has(name) then
+                    var proto: object = self.namespace.get(name)
+                    if not instanceof(proto, shark_variable) then
+                        self.write_error("name '")
+                        self.write_error(name)
+                        self.write_error("' is already defined.")
+                        self.error()
+                    else if not cast(proto, shark_variable).type.equals(type) then
+                        self.write_error("variable definition doesn't match declaration.")
+                else
+                    self.namespace.add(name, new shark_variable (name, type))
+                if not type.get_cast(self.exp_type) then
+                    self.write_error("invalid initializer type in variable declaration.")
+                    self.error()
+                self.backend.global_var_decl(name, type, true)
+            else if self.namespace.has(name) then
+                self.write_error("name '")
+                self.write_error(name)
+                self.write_error("' is already defined.")
+                self.error()
+            else
+                self.namespace.add(name, new shark_variable (name, type))
+                self.backend.global_var_decl(name, type, false)
+            self.eol()
+            return true
+        else
+            return false
+    
+    function function_decl() -> bool
+        if self.match("function") then
+            var name: str = self.consume("name")
+            self.args()
+            var type: shark_type = null
+            if self.match("->") then
+                type = self.type()
+            self.eol()
+            var proto: object = null
+            if self.in_type then
+                if self.type_context.namespace.has(name) then
+                    proto = self.type_context.namespace.get(name)
+            else if not self.in_type and self.namespace.has(name) then
+                proto = self.namespace.get(name)
+            var func: shark_function = null
+            if proto == null then
+                func = new shark_function (name, self.type_context, self.arg_names, self.arg_types, type)
+                if self.in_type then
+                    if self.in_impl then
+                        self.write_error("method '")
+                        self.write_error(name)
+                        self.write_error("' was not declared in type header.")
+                        self.error()
+                    self.type_context.namespace.add(name, func)
+                    self.type_context.methods.push(func)
+                    if name == self.type_context.name then
+                        if type != null then
+                            self.write_error("type constructor should not return a value.")
+                            self.error()
+                        self.type_context.constructor = func
+                        self.backend.declare_constructor(func)
+                    else
+                        self.backend.declare_method(func)
+                else
+                    self.namespace.add(name, func)
+                    self.backend.declare_function(func)
+            else if not instanceof(proto, shark_function) then
+                self.write_error("name '")
+                self.write_error(name)
+                self.write_error("' is already defined.")
+                self.error()
+            else if cast(proto, shark_function).implemented and not self.in_type then
+                self.write_error("function '")
+                self.write_error(name)
+                self.write_error("' is already implemented.")
+                self.error()
+            else
+                func = cast(proto, shark_function)
+                if not self.function_equals(self.arg_types, func.arg_types, type, func.type) then
+                    self.write_error("function signature doesn't match prototype.")
+                    self.error()
+                else
+                    func.arg_names = self.arg_names
+            self.function_context = func
+            self.in_function = true
+            if self.token.type != "indent" then
+                if self.in_impl then
+                    self.write_error("expected a function body in typedef implementation.")
+                    self.error()
+                self.backend.close_function_declaration()
+            else
+                if self.in_type and not self.in_impl then
+                    self.write_error("unexpected function body in typedef declaration.")
+                    self.error()
+                self.backend.enter_function(func)
+                var context: shark_namespace = new shark_namespace (null)
+                for i: int = 0, i < self.arg_names.size(), i++ do
+                    context.add(cast(self.arg_names.get(i), str),
+                        new shark_variable (cast(self.arg_names.get(i), str),
+                            cast(self.arg_types.get(i), shark_type)))
+                self.do_block(context)
+                self.backend.exit_function()
+            self.function_context = null
+            self.in_function = false
+            return true
+        else
+            return false
+    
+    function args()
+        self.arg_names = new list ()
+        self.arg_types = new list ()
+        self.expect("(")
+        if not self.match(")") then
+            self.arg_names.push(self.consume("name"))
+            self.expect(":")
+            self.arg_types.push(self.type())
+            while self.match(",") do
+                self.arg_names.push(self.consume("name"))
+                self.expect(":")
+                self.arg_types.push(self.type())
+            self.expect(")")
+    
+    function function_equals(xargs: list, yargs: list, xtype: shark_type, ytype: shark_type) -> bool
+        if xargs.size() != yargs.size() then
+            return false
+        for i: int = 0, i < xargs.size(), i++ do
+            if not cast(xargs.get(i), shark_type).equals(cast(yargs.get(i), shark_type)) then
+                return false
+        return xtype == ytype or (xtype != null and xtype.equals(ytype))
+    
+    function inline_stat() -> bool
+        if self.match("inline") then
+            self.backend.inline_stat(self.consume("str"))
+            self.eol()
+            return true
+        else
+            return false
+    
+    function block()
+        self.do_block(new shark_namespace (self.context))
+    
+    function do_block(context: shark_namespace)
+        self.seol()
+        self.indent()
+        self.context = context
+        self.backend.enter_block()
+        while not self.match_dedent() do
+            if not (self.var_decl() or self.statement() or self.inline_stat()) then
+                self.write_error("expected declaration or statement.")
+                self.error()
+        self.context = self.context.parent
+        self.backend.exit_block()
+    
+    function statement() -> bool
+        if self.match("if") then
+            if self.else_if then
+                self.backend.enter_else_if()
+            self.exp()
+            self.expect("then")
+            var else_if: bool = false
+            if self.else_if then
+                else_if = true
+                self.backend.else_if()
+                self.else_if = false
+            else
+                self.backend.if_stat()
+            if self.exp_type != shark_basic_type_bool then
+                self.write_error("expected a boolean value as predicate.")
+                self.error()
+            self.block()
+            if self.match("else") then
+                if self.token.value == "if" then
+                    self.else_if = true
+                    self.statement()
+                else
+                    self.backend.else_clause()
+                    self.block()
+            if else_if then
+                self.backend.close_else_if()
+            else
+                self.backend.close_if()
+            return true
+        else if self.match("while") then
+            self.backend.enter_while()
+            self.exp()
+            self.expect("do")
+            if self.exp_type != shark_basic_type_bool then
+                self.write_error("expected a boolean value as predicate.")
+                self.error()
+            self.backend.while_stat()
+            var prev_in_loop: bool = self.in_loop
+            self.in_loop = true
+            self.block()
+            self.in_loop = prev_in_loop
+            self.backend.exit_while()
+            return true
+        else if self.match("for") then
+            self.backend.enter_for()
+            var context: shark_namespace = new shark_namespace (self.context)
+            var name: str = null
+            var type: shark_type = null
+            if not self.match(",") then
+                name = self.consume("name")
+                self.expect(":")
+                type = self.type()
+                self.expect("=")
+                self.exp()
+                if not type.get_cast(self.exp_type) then
+                    self.write_error("invalid initializer.")
+                    self.error()
+                self.expect(",")
+                context.add(name, new shark_variable (name, type))
+                self.backend.for_init(name, type)
+            self.context = context
+            if not self.match(",") then
+                self.exp()
+                if self.exp_type != shark_basic_type_bool then
+                    self.write_error("expected a boolean value as predicate.")
+                    self.error()
+                self.expect(",")
+                self.backend.for_cond()
+            if self.token.value != "do" then
+                self.assign()
+                self.backend.for_step()
+            self.backend.for_stat()
+            self.expect("do")
+            var prev_in_loop: bool = self.in_loop
+            self.in_loop = true
+            self.do_block(context)
+            self.in_loop = prev_in_loop
+            self.backend.exit_for()
+            return true
+        else if self.match("break") then
+            if not self.in_loop then
+                self.write_error("break statement outside loop.")
+                self.error()
+            self.eol()
+            self.backend.break_stat()
+            return true
+        else if self.match("continue") then
+            if not self.in_loop then
+                self.write_error("continue statement outside loop.")
+                self.error()
+            self.eol()
+            self.backend.continue_stat()
+            return true
+        else if self.match("return") then
+            if self.token.value != ";" and self.token.type != "newline" then
+                self.exp()
+                if self.function_context.type == null then
+                    self.write_error("unexpected return value in void function.")
+                    self.error()
+                else if not self.function_context.type.get_cast(self.exp_type) then
+                    self.write_error("invalid return value.")
+                    self.error()
+                self.eol()
+                self.backend.return_stat(true)
+            else if self.function_context.type != null then
+                self.write_error("missing return value in void function.")
+                self.error()
+            else
+                self.eol()
+                self.backend.return_stat(false)
+            return true
+        else
+            return self.assign_stat()
+    
+    function assign_stat() -> bool
+        if not self.assign() then
+            return false
+        self.eol()
+        self.backend.assign_stat()
+        return true
+    
+    function assign() -> bool
+        self.assign_target = true
+        var target: bool = self.optional_exp()
+        self.assign_target = false
+        return target
+    
+    function match_inc() -> bool
+        if self.assign_target then
+            if self.match("++") then
+                if self.exp_type != shark_basic_type_int then
+                    self.write_error("invalid increment target (not an integer).")
+                    self.error()
+                self.assign_op = "++"
+                return true
+            else if self.match("--") then
+                if self.exp_type != shark_basic_type_int then
+                    self.write_error("invalid increment target (not an integer).")
+                    self.error()
+                self.assign_op = "--"
+                return true
+            else
+                return false
+        else
+            return false
+    
+    function match_assign() -> bool
+        if self.assign_target and self.token.type == "assign" then
+            self.backend.enter_assign()
+            var type: shark_type = self.exp_type
+            var op: str = self.next()
+            self.exp()
+            if not type.get_cast(self.exp_type) then
+                self.write_error("invalid assignment.")
+                self.error()
+            else if op != "=" and type != shark_basic_type_int and type != shark_basic_type_float then
+                self.write_error("invalid type in augmented assignment.")
+                self.error()
+            self.assign_op = op
+            return true
+        else
+            return false
+    
+    function binary_op(priority: int) -> bool
+        var exp: bool = self.unary_op()
+        while exp do
+            var type: shark_type = self.exp_type
+            var op: str = self.token.value
+            if (shark_compiler_op_priority.has(op)
+            and shark_compiler_op_priority.get(op) > priority) then
+                var strop: bool = false
+                var objop: bool = false
+                self.next()
+                self.backend.enter_binop()
+                self.binary_op(shark_compiler_op_priority.get(op))
+                if op == "and" or op == "or" then
+                    if type != shark_basic_type_bool or self.exp_type != shark_basic_type_bool then
+                        self.write_error("expected a boolean value in short circuit operator.")
+                        self.error()
+                    self.exp_type = shark_basic_type_bool
+                else if op == "==" or op == "!=" then
+                    if not type.get_cast(self.exp_type) and not self.exp_type.get_cast(type) then
+                        self.write_error("invalid type in operation.")
+                        self.error()
+                    if type == shark_basic_type_str and self.exp_type == shark_basic_type_str then
+                        strop = true
+                    else if instanceof(self.exp_type, shark_custom_type) or instanceof(type, shark_custom_type) then
+                        objop = true
+                    self.exp_type = shark_basic_type_bool
+                else if type != self.exp_type then
+                    self.write_error("invalid type in operation.")
+                    self.error()
+                else if type != shark_basic_type_int and type != shark_basic_type_float then
+                    self.write_error("invalid type in operation.")
+                    self.error()
+                else if ((op == "%" or op == "<<"
+                         or op == ">>" or op == "&"
+                         or op == "|" or op == "^")
+                        and type != shark_basic_type_int) then
+                    self.write_error("invalid type in operation.")
+                    self.error()
+                else if op == "<" or op == "<=" or op == ">" or op == ">=" then
+                    self.exp_type = shark_basic_type_bool
+                self.backend.binary_op(op, strop, objop)
+            else
+                break
+        return exp
+    
+    function unary_op() -> bool
+        var op: str = self.token.value
+        if op == "not" or op == "-" or op == "~" then
+            self.next()
+            if not self.unary_op() then
+                self.write_error("expected expression after '")
+                self.write_error(op)
+                self.write_error("'.")
+                self.error()
+            else if op == "not" then
+                if self.exp_type != shark_basic_type_bool then
+                    self.write_error("expected a boolean value in logic negation.")
+                    self.error()
+            else if op == "~" then
+                if self.exp_type != shark_basic_type_int then
+                    self.write_error("expected integer value in binary negation.")
+                    self.error()
+            else if self.exp_type != shark_basic_type_int and self.exp_type != shark_basic_type_float then
+                self.write_error("invalid type in numeric negation.")
+                self.error()
+            self.backend.unary_op(op)
+            return true
+        else
+            return self.post_op()
+    
+    function post_op() -> bool
+        var exp: bool = self.primary_exp()
+        while exp do
+            if self.match("[") then
+                self.backend.enter_index()
+                if not instanceof(self.exp_type, shark_array_type) then
+                    self.write_error("expected an array as indexing target.")
+                    self.error()
+                var type: shark_array_type = cast(self.exp_type, shark_array_type)
+                self.exp()
+                if self.exp_type != shark_basic_type_int then
+                    self.write_error("array index should be an integer.")
+                    self.error()
+                self.expect("]")
+                if self.match("[") then
+                    self.write_error("can't double index into an array, please refactor the code.")
+                    self.error()
+                self.exp_type = type.type
+                if self.match_inc() then
+                    self.backend.inc_index(self.assign_op, type.type)
+                else if self.match_assign() then
+                    self.backend.set_index(self.assign_op, type.type)
+                else
+                    self.backend.get_index(type.type)
+            else if self.match(".") then
+                var name: str = self.consume("name")
+                if not instanceof(self.exp_type, shark_custom_type) then
+                    self.write_error("expected a custom type in attribute lookup.")
+                    self.error()
+                else if not cast(self.exp_type, shark_custom_type).namespace.has(name) then
+                    self.write_error("'")
+                    self.write_error(cast(self.exp_type, shark_custom_type).name)
+                    self.write_error("' has no attribute '")
+                    self.write_error(name)
+                    self.write_error("'.")
+                    self.error()
+                else
+                    var value: object = cast(self.exp_type, shark_custom_type).namespace.get(name)
+                    if instanceof(value, shark_function) and self.match("(") then
+                        var callee: shark_function = self.callee
+                        self.callee = cast(value, shark_function)
+                        self.call_args()
+                        self.exp_type = self.callee.type
+                        self.backend.call_method(self.callee)
+                        self.callee = callee
+                    else if instanceof(value, shark_variable) then
+                        var variable: shark_variable = cast(value, shark_variable)
+                        self.exp_type = cast(value, shark_variable).type
+                        if self.match_inc() then
+                            self.backend.inc_field(variable, self.assign_op)
+                        else if self.match_assign() then
+                            self.backend.set_field(variable, self.assign_op)
+                        else
+                            self.backend.get_field(variable)
+                    else
+                        self.write_error("invalid syntax.")
+                        self.error()
+            else
+                break
+        return exp
+    
+    function call_args()
+        self.backend.enter_call()
+        var arg_count: int = 0
+        
+        if not self.match(")") then
+            self.exp()
+            if arg_count < self.callee.arg_names.size() then
+                if not cast(self.callee.arg_types.get(arg_count), shark_type).get_cast(self.exp_type) then
+                    self.write_error("invalid type in argument passing.")
+                    self.error()
+            arg_count += 1
+            self.backend.push_arg()
+            while self.match(",") do
+                self.exp()
+                if arg_count <= self.callee.arg_names.size() then
+                    if not cast(self.callee.arg_types.get(arg_count), shark_type).get_cast(self.exp_type) then
+                        self.write_error("invalid type in argument passing.")
+                        self.error()
+                arg_count += 1
+                self.backend.push_arg()
+            self.expect(")")
+        
+        if self.callee.arg_names.size() != arg_count then
+            self.write_error("arity mismatch in function call. (expected ")
+            self.write_error(itos(self.callee.arg_names.size()))
+            self.write_error(" arguments but got ")
+            self.write_error(itos(arg_count))
+            self.write_error(").")
+            self.error()
+    
+    function primary_exp() -> bool
+        if self.literal() then
+            return true
+        else if self.token.type == "name" then
+            var name: str = self.next()
+            var context: shark_namespace = self.context
+            while context != null do
+                if context.has(name) then
+                    break
+                context = context.parent
+            if context != null then
+                self.exp_type = cast(context.get(name), shark_variable).type
+                if self.match_inc() then
+                    self.backend.inc_local(name, self.assign_op)
+                else if self.match_assign() then
+                    self.backend.set_local(name, self.assign_op)
+                else
+                    self.backend.get_local(name)
+            else if not self.namespace.has(name) then
+                self.write_error("name '")
+                self.write_error(name)
+                self.write_error("' is not defined.")
+                self.error()
+            else if instanceof(self.namespace.get(name), shark_function) and self.match("(") then
+                var callee: shark_function = self.callee
+                self.callee = cast(self.namespace.get(name), shark_function)
+                self.call_args()
+                self.exp_type = self.callee.type
+                self.callee = callee
+                self.backend.call_function(name)
+            else if instanceof(self.namespace.get(name), shark_variable) then
+                self.exp_type = cast(self.namespace.get(name), shark_variable).type
+                if self.match_inc() then
+                    self.backend.inc_global(name, self.assign_op)
+                else if self.match_assign() then
+                    self.backend.set_global(name, self.assign_op)
+                else
+                    self.backend.get_global(name)
+            else
+                self.write_error("name '")
+                self.write_error(name)
+                self.write_error("' is not a variable.")
+                self.error()
+            return true
+        else if self.match("self") then
+            if not self.in_type then
+                self.write_error("'self' outside class.")
+                self.error()
+            self.exp_type = self.type_context
+            self.backend.self_exp()
+            return true
+        else if self.match("sizeof") then
+            self.expect("(")
+            self.exp()
+            if not instanceof(self.exp_type, shark_array_type) then
+                self.write_error("can't get the size of a non array value.")
+                self.error()
+            self.exp_type = shark_basic_type_int
+            self.expect(")")
+            self.backend.sizeof_exp()
+            return true
+        else if self.match("new") then
+            if self.match("[") then
+                self.exp()
+                if self.exp_type != shark_basic_type_int then
+                    self.write_error("array size should be an integer.")
+                    self.error()
+                self.expect("]")
+                var type: shark_type = self.type()
+                self.exp_type = new shark_array_type (type)
+                self.backend.array_new(self.exp_type)
+            else
+                var type: shark_custom_type = cast(self.custom_type(), shark_custom_type)
+                if type.constructor == null then
+                    self.write_error("can't instantiate type (no constructor defined).")
+                    self.error()
+                var callee: shark_function = self.callee
+                self.callee = cast(type.constructor, shark_function)
+                self.expect("(")
+                self.call_args()
+                self.callee = callee
+                self.exp_type = type
+                self.backend.object_new(type)
+            return true
+        else if self.match("instanceof") then
+            self.expect("(")
+            self.exp()
+            if not instanceof(self.exp_type, shark_custom_type) and self.exp_type != shark_basic_type_any then
+                self.write_error("can't test membership of a non object value.")
+                self.error()
+            self.expect(",")
+            var type: shark_custom_type = cast(self.custom_type(), shark_custom_type)
+            self.expect(")")
+            self.exp_type = shark_basic_type_bool
+            self.backend.instanceof_exp(type)
+            return true
+        else if self.match("cast") then
+            self.expect("(")
+            self.exp()
+            self.expect(",")
+            var type: shark_type = self.type()
+            self.expect(")")
+            self.exp_type = type
+            self.backend.cast_exp(type)
+            return true
+        else if self.match("(") then
+            self.exp()
+            self.expect(")")
+            self.backend.nested_exp()
+            return true
+        else
+            return false
+    
+    function literal() -> bool
+        if self.match("null") then
+            self.exp_type = shark_basic_type_void
+            self.backend.null_exp()
+        else if self.match("true") then
+            self.exp_type = shark_basic_type_bool
+            self.backend.true_exp()
+        else if self.match("false") then
+            self.exp_type = shark_basic_type_bool
+            self.backend.false_exp()
+        else if self.token.type == "int" then
+            var value: str = self.next()
+            self.exp_type = shark_basic_type_int
+            self.backend.int_exp(value)
+        else if self.token.type == "float" then
+            var value: str = self.next()
+            self.exp_type = shark_basic_type_float
+            self.backend.float_exp(value)
+        else if self.token.type == "char" then
+            var value: str = self.next()
+            self.exp_type = shark_basic_type_char
+            self.backend.char_exp(value)
+        else if self.token.type == "str" then
+            var value: str = self.next()
+            self.exp_type = shark_basic_type_str
+            self.backend.str_exp(value)
+        else
+            return false
+        return true
+    
+    function optional_exp() -> bool
+        return self.binary_op(0)
+    
+    function exp()
+        var prev_assign_target: bool = self.assign_target
+        self.assign_target = false
+        if not self.binary_op(0) then
+            self.write_error("expected expression.")
+            self.error()
+        self.assign_target = prev_assign_target

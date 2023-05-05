@@ -1,0 +1,146 @@
+###############################################################################
+### Copyright #################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+###############################################################################
+
+import "shark_nodes.api"
+import "shark_backend.api"
+
+class shark_namespace
+    function shark_namespace(parent: shark_namespace)
+        self.parent = parent
+        self.table = new strmap()
+        self.data = new list()
+    
+    function add(name: str, value: object)
+        self.table.set(name, self.data.size())
+        self.data.push(value)
+    
+    function has(name: str) -> bool
+        return self.table.has(name)
+    
+    function get(name: str) -> object
+        return self.data.get(self.table.get(name))
+
+class shark_type
+    function shark_type()
+        shark_null_stat()
+    
+    function equals(other: shark_type) -> bool
+        return self == other
+    
+    function get_cast(other: shark_type) -> bool
+        return self.equals(other)
+
+class shark_basic_type
+    function shark_basic_type(name: str)
+        self.name = name
+    
+    function get_cast(other: shark_type) -> bool
+        return other == self or (self == shark_basic_type_str
+            and other == shark_basic_type_void)
+
+class shark_basic_any_type
+    function shark_basic_any_type()
+        self.name = "object"
+    
+    function get_cast(other: shark_type) -> bool
+        return (other == self or instanceof(other, shark_custom_type)
+            or instanceof(other, shark_array_type) or other == shark_basic_type_str
+            or other == shark_basic_type_void)
+
+var shark_basic_type_void: shark_type = null
+var shark_basic_type_bool: shark_type = null
+var shark_basic_type_int: shark_type = null
+var shark_basic_type_float: shark_type = null
+var shark_basic_type_char: shark_type = null
+var shark_basic_type_str: shark_type = null
+var shark_basic_type_any: shark_type = null
+
+var shark_compiler_basic_types: shark_namespace = null
+
+class shark_custom_type
+    function shark_custom_type(name: str, parent: shark_custom_type)
+        self.name = name
+        self.parent = parent
+        self.implemented = false
+        self.namespace = new shark_namespace (null)
+        self.fields = new list ()
+        self.methods = new list ()
+        self.constructor = null
+        if parent != null then
+            for i: int = 0, i < parent.namespace.data.size(), i++ do
+                var value: object = parent.namespace.data.get(i)
+                self.namespace.add(shark_object_get_name(value), value)
+            self.constructor = parent.constructor
+    
+    function issubtype(other: shark_custom_type) -> bool
+        var parent: shark_custom_type = self.parent
+        while parent != null do
+            if parent == other then
+                return true
+            parent = parent.parent
+        return false
+    
+    function get_cast(other: shark_type) -> bool
+        if instanceof(other, shark_custom_type) then
+            return other == self or cast(other, shark_custom_type).issubtype(self)
+        else
+            return other == shark_basic_type_void
+
+class shark_array_type
+    function shark_array_type(type: shark_type)
+        self.type = type
+    
+    function equals(other: shark_type) -> bool
+        if not instanceof(other, shark_array_type) then
+            return false
+        else
+            return self.type.equals(cast(other, shark_array_type).type)
+    
+    function get_cast(other: shark_type) -> bool
+        return self.equals(other) or other == shark_basic_type_void
+
+function shark_object_get_name(value: object) -> str
+    if instanceof(value, shark_variable) then
+        return cast(value, shark_variable).name
+    else
+        return cast(value, shark_function).name
+
+class shark_variable
+    function shark_variable(name: str, type: shark_type)
+        self.name = name
+        self.type = type
+        self.source_type = null
+
+class shark_function
+    function shark_function(name: str, source_type: shark_custom_type,
+        arg_names: list, arg_types: list, type: shark_type)
+        self.name = name
+        self.root_type = source_type
+        self.source_type = source_type
+        self.arg_names = arg_names
+        self.arg_types = arg_types
+        self.type = type
+        self.implemented = false

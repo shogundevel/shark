@@ -1,0 +1,506 @@
+###############################################################################
+### Copyright #################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+###############################################################################
+
+import "shark_backend.api"
+
+class shark_backend_shark (shark_backend)
+    var indent_level: int
+    var out: FILE
+    var buf: strbuf
+    var cond: str
+    var step: str
+    var exp: str
+    var exp_left: str
+    var exp_base: str
+    var call_stack: list
+    var call_args: list
+    
+    function shark_backend_shark()
+    function indent()
+    function dedent()
+    function write_indent()
+    function push()
+    function exit_assign()
+    function write_args()
+    function exit_call()
+
+class shark_backend_shark
+    function shark_backend_shark()
+        self.indent_level = 0
+        self.out = null
+        self.buf = null
+        self.cond = null
+        self.step = null
+        self.exp = null
+        self.exp_left = null
+        self.exp_base = null
+        self.call_stack = null
+        self.call_args = null
+    
+    function indent()
+        self.indent_level += 1
+    
+    function dedent()
+        self.indent_level -= 1
+    
+    function write_indent()
+        for i: int = 0, i < self.indent_level, i++ do
+            self.out.write("    ")
+    
+    function begin(out: str)
+        self.buf = new strbuf ()
+        self.out = open(out, 'w')
+        if self.out == null then
+            write("can't open output file '")
+            write(out)
+            write("' for writing, compilation aborted.")
+            exit(EXIT_FAILURE)
+        self.out.write("function __shark_array_new(size)\n")
+        self.out.write("    var data = [ ]\n")
+        self.out.write("    for _ in range(size) do\n")
+        self.out.write("        data << null\n")
+        self.out.write("    return data\n")
+        self.call_stack = new list ()
+    
+    function close()
+        self.out.close()
+    
+    function enter_type_decl(type: shark_custom_type)
+        shark_null_stat()
+    
+    function exit_type_decl()
+        shark_null_stat()
+    
+    function enter_type_impl(type: shark_custom_type)
+        self.out.write("class ")
+        self.out.write(type.name)
+        
+        if type.parent != null then
+            self.out.write("(")
+            self.out.write(type.parent.name)
+            self.out.write(")")
+            
+        self.out.write("\n")
+        self.indent()
+    
+    function exit_type_impl()
+        self.dedent()
+    
+    function var_decl(name: str, type: shark_type)
+        self.write_indent()
+        self.out.write("var ")
+        self.out.write(name)
+        self.out.write(" = ")
+        self.out.write(self.exp)
+        self.out.write("\n")
+    
+    function global_var_decl(name: str, type: shark_type, value: bool)
+        if value then
+            self.out.write("var ")
+            self.out.write(name)
+            self.out.write(" = ")
+            self.out.write(self.exp)
+            self.out.write("\n")
+    
+    function declare_constructor(function_object: shark_function)
+        shark_null_stat()
+    
+    function declare_method(function_object: shark_function)
+        shark_null_stat()
+    
+    function declare_function(function_object: shark_function)
+        shark_null_stat()
+    
+    function close_function_declaration()
+        shark_null_stat()
+    
+    function enter_function(function_object: shark_function)
+        if (function_object.source_type != null
+        and function_object.name == function_object.source_type.name) then
+            self.write_indent()
+            self.out.write("function init(")
+            for i: int = 0, i < function_object.arg_names.size(), i++ do
+                if i != 0 then
+                    self.out.write(", ")
+                self.out.write(cast(function_object.arg_names.get(i), str))
+            self.out.write(")\n        self.")
+            self.out.write(function_object.name)
+            self.out.write("(")
+            for i: int = 0, i < function_object.arg_names.size(), i++ do
+                if i != 0 then
+                    self.out.write(", ")
+                self.out.write(cast(function_object.arg_names.get(i), str))
+            self.out.write(")\n")
+        self.write_indent()
+        self.out.write("function ")
+        self.out.write(function_object.name)
+        self.out.write("(")
+        for i: int = 0, i < function_object.arg_names.size(), i++ do
+            if i != 0 then
+                self.out.write(", ")
+            self.out.write(cast(function_object.arg_names.get(i), str))
+        self.out.write(")\n")
+    
+    function exit_function()
+        shark_null_stat()
+    
+    function enter_block()
+        self.indent()
+    
+    function empty_block()
+        self.write_indent()
+        self.out.write("pass\n")
+    
+    function exit_block()
+        self.dedent()
+    
+    function if_stat()
+        self.write_indent()
+        self.out.write("if ")
+        self.out.write(self.exp)
+        self.out.write(" then\n")
+    
+    function enter_else_if()
+        shark_null_stat()
+    
+    function else_if()
+        self.write_indent()
+        self.out.write("else if ")
+        self.out.write(self.exp)
+        self.out.write(" then\n")
+    
+    function else_clause()
+        self.write_indent()
+        self.out.write("else\n")
+    
+    function close_if()
+        shark_null_stat()
+    
+    function close_else_if()
+        shark_null_stat()
+    
+    function enter_while()
+        shark_null_stat()
+    
+    function while_stat()
+        self.write_indent()
+        self.out.write("while ")
+        self.out.write(self.exp)
+        self.out.write(" do\n")
+    
+    function exit_while()
+        shark_null_stat()
+    
+    function enter_for()
+        self.cond = null
+        self.call_stack.push(self.step)
+        self.step = null
+        self.write_indent()
+        self.out.write("if true then\n")
+        self.indent()
+    
+    function push()
+        self.exp_base = self.exp_left
+        self.exp_left = self.exp
+    
+    function for_init(name: str, type: shark_type)
+        self.write_indent()
+        self.out.write("var ")
+        self.out.write(name)
+        self.out.write(" = ")
+        self.out.write(self.exp)
+        self.out.write("\n")
+    
+    function for_cond()
+        self.cond = self.exp
+    
+    function for_step()
+        self.step = self.exp
+    
+    function for_stat()
+        self.write_indent()
+        self.out.write("while ")
+        if self.cond != null then
+            self.out.write(self.cond)
+        else
+            self.out.write("true")
+        self.out.write(" do\n")
+    
+    function exit_for()
+        if self.step != null then
+            self.indent()
+            self.write_indent()
+            self.dedent()
+            self.out.write(self.step)
+            self.out.write("\n")
+        self.step = cast(self.call_stack.pop(), str)
+        self.dedent()
+    
+    function break_stat()
+        self.write_indent()
+        self.out.write("break\n")
+    
+    function continue_stat()
+        self.write_indent()
+        self.out.write("continue\n")
+    
+    function return_stat(value: bool)
+        self.write_indent()
+        if value then
+            self.out.write("return ")
+            self.out.write(self.exp)
+            self.out.write("\n")
+        else
+            self.out.write("return\n")
+    
+    function assign_stat()
+        self.write_indent()
+        self.out.write(self.exp)
+        self.out.write("\n")
+    
+    function enter_assign()
+        self.call_stack.push(self.exp_left)
+        self.call_stack.push(self.exp_base)
+        self.push()
+    
+    function exit_assign()
+        self.exp_base = cast(self.call_stack.pop(), str)
+        self.exp_left = cast(self.call_stack.pop(), str)
+    
+    function enter_binop()
+        self.call_stack.push(self.exp_left)
+        self.push()
+    
+    function binary_op(op: str, strop: bool, objop: bool)
+        if op == "and" then
+            op = " and "
+        if op == "or" then
+            op = " or "
+        self.buf.write(self.exp_left)
+        self.buf.write(op)
+        self.buf.write(self.exp)
+        self.exp = self.buf.get()
+        self.exp_left = cast(self.call_stack.pop(), str)
+    
+    function unary_op(op: str)
+        if op == "not" then
+            op = "not "
+        self.buf.write(op)
+        self.buf.write(self.exp)
+        self.exp = self.buf.get()
+    
+    function enter_index()
+        self.call_stack.push(self.exp_left)
+        self.push()
+    
+    function inc_index(op: str, type: shark_type)
+        if op == "++" then
+            op = "+"
+        if op == "--" then
+            op = "-"
+        self.buf.write(self.exp_left)
+        self.buf.write("[")
+        self.buf.write(self.exp)
+        self.buf.write("]")
+        self.buf.write(op)
+        self.buf.write("=1")
+        self.exp_left = cast(self.call_stack.pop(), str)
+        self.exp = self.buf.get()
+    
+    function set_index(op: str, type: shark_type)
+        self.buf.write(self.exp_base)
+        self.buf.write("[")
+        self.buf.write(self.exp_left)
+        self.buf.write("]")
+        self.buf.write(op)
+        self.buf.write(self.exp)
+        self.exp_left = cast(self.call_stack.pop(), str)
+        self.exp = self.buf.get()
+        self.exit_assign()
+    
+    function get_index(type: shark_type)
+        self.buf.write(self.exp_left)
+        self.buf.write("[")
+        self.buf.write(self.exp)
+        self.buf.write("]")
+        self.exp_left = cast(self.call_stack.pop(), str)
+        self.exp = self.buf.get()
+    
+    function call_method(function_object: shark_function)
+        self.buf.write(self.exp_left)
+        self.buf.write(".")
+        self.buf.write(function_object.name)
+        self.buf.write("(")
+        self.write_args()
+        self.buf.write(")")
+        self.exit_call()
+        self.exp = self.buf.get()
+    
+    function write_args()
+        if self.call_args.size() != 0 then
+            self.buf.write(cast(self.call_args.get(0), str))
+            for i: int = 1, i < self.call_args.size(), i++ do
+                self.buf.write(", ")
+                self.buf.write(cast(self.call_args.get(i), str))
+    
+    function enter_call()
+        self.call_stack.push(self.exp_left)
+        self.call_stack.push(self.call_args)
+        self.push()
+        self.call_args = new list ()
+    
+    function exit_call()
+        self.call_args = cast(self.call_stack.pop(), list)
+        self.exp_left = cast(self.call_stack.pop(), str)
+    
+    function push_arg()
+        self.call_args.push(self.exp)
+    
+    function inc_field(field: shark_variable, op: str)
+        if op == "++" then
+            op = "+"
+        if op == "--" then
+            op = "-"
+        self.buf.write(self.exp)
+        self.buf.write(".")
+        self.buf.write(field.name)
+        self.buf.write(op)
+        self.buf.write("=1")
+        self.exp = self.buf.get()
+    
+    function set_field(field: shark_variable, op: str)
+        self.buf.write(self.exp_left)
+        self.buf.write(".")
+        self.buf.write(field.name)
+        self.buf.write(op)
+        self.buf.write(self.exp)
+        self.exp = self.buf.get()
+        self.exit_assign()
+    
+    function get_field(field: shark_variable)
+        self.buf.write(self.exp)
+        self.buf.write(".")
+        self.buf.write(field.name)
+        self.exp = self.buf.get()
+    
+    function inc_local(name: str, op: str)
+        if op == "++" then
+            op = "+"
+        if op == "--" then
+            op = "-"
+        self.buf.write(name)
+        self.buf.write(op)
+        self.buf.write("=1")
+        self.exp = self.buf.get()
+    
+    function set_local(name: str, op: str)
+        self.buf.write(name)
+        self.buf.write(op)
+        self.buf.write(self.exp)
+        self.exp = self.buf.get()
+        self.exit_assign()
+    
+    function get_local(name: str)
+        self.exp = name
+    
+    function call_function(name: str)
+        self.buf.write(name)
+        self.buf.write("(")
+        self.write_args()
+        self.buf.write(")")
+        self.exit_call()
+        self.exp = self.buf.get()
+    
+    function inc_global(name: str, op: str)
+        self.inc_local(name, op)
+    
+    function set_global(name: str, op: str)
+        self.set_local(name, op)
+    
+    function get_global(name: str)
+        self.exp = name
+    
+    function self_exp()
+        self.exp = "self"
+    
+    function sizeof_exp()
+        self.buf.write("sizeof(")
+        self.buf.write(self.exp)
+        self.buf.write(")")
+        self.exp = self.buf.get()
+    
+    function array_new(type: shark_type)
+        self.buf.write("__shark_array_new(")
+        self.buf.write(self.exp)
+        self.buf.write(")")
+        self.exp = self.buf.get()
+    
+    function object_new(type: shark_custom_type)
+        self.buf.write("new ")
+        self.buf.write(type.name)
+        self.buf.write("(")
+        self.write_args()
+        self.exit_call()
+        self.buf.write(")")
+        self.exp = self.buf.get()
+    
+    function instanceof_exp(type: shark_custom_type)
+        self.buf.write("instanceof(")
+        self.buf.write(self.exp)
+        self.buf.write(", ")
+        self.buf.write(type.name)
+        self.buf.write(")")
+        self.exp = self.buf.get()
+    
+    function cast_exp(type: shark_type)
+        shark_null_stat()
+    
+    function nested_exp()
+        self.buf.write("(")
+        self.buf.write(self.exp)
+        self.buf.write(")")
+        self.exp = self.buf.get()
+    
+    function null_exp()
+        self.exp = "null"
+    
+    function true_exp()
+        self.exp = "true"
+    
+    function false_exp()
+        self.exp = "false"
+    
+    function int_exp(value: str)
+        self.exp = value
+    
+    function float_exp(value: str)
+        self.exp = value
+    
+    function char_exp(value: str)
+        self.exp = value
+    
+    function str_exp(value: str)
+        self.exp = value

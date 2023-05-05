@@ -27,8 +27,7 @@
 import system.string
 import system.util
 
-import system.io: printf
-
+import system.io: puts, printf
 import sharkenv.builtin
 
 var exec_name = "sharkenv.shk"

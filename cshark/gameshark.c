@@ -24,6 +24,11 @@
 ** 
 ******************************************************************************/
 
+#ifdef __PSP__
+#define SHARK_UNBOX
+#define CSHARK_NO_FS
+#endif
+
 #include "cshark.h"
 #include "cshark_core.c"
 #include "cshark_system.c"
@@ -32,6 +37,7 @@
 #include "SDL_image.h"
 #include "SDL_ttf.h"
 #include "SDL2_rotozoom.h"
+#include "SDL_main.h"
 
 #define SHARK_NATIVE(name) \
     static shark_value shark_lib_ ## name(shark_vm *vm, shark_value *args, shark_error *error)
@@ -163,7 +169,11 @@ shark_activity *shark_activity_new()
 {
     shark_activity *self = shark_object_new(shark_activity_class);
     shark_table_init((shark_table *) self);
+#ifdef __PSP__
+    self->window = SDL_CreateWindow("SharkGame", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 480, 272, 0);
+#else
     self->window = SDL_CreateWindow("Gameshark", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 320 * SHARK_SCALE, 192 * SHARK_SCALE, SDL_WINDOW_SHOWN);
+#endif
     self->window_display = SDL_GetWindowSurface(self->window);
     self->display = SDL_CreateRGBSurface(0, 320, 192, 32, 0, 0, 0, 0);
     if (self->display == NULL) shark_fatal_error(NULL, "could not initialize display.");
@@ -395,12 +405,22 @@ static void shark_init_game_library(shark_vm *vm, shark_string *library_path)
     function->code.native_code = shark_lib_texture_get_size_y;
 }
 
+#ifdef __PSP__
+#include <pspkernel.h>
+#include <pspctrl.h>
+#endif
+
 void shark_exec_game(shark_vm *vm)
 {
     if (SDL_Init(SDL_INIT_VIDEO)
     || !IMG_Init(IMG_INIT_PNG)
     || TTF_Init())
         shark_fatal_error(NULL, "couldn't initialize libraries.");
+    
+#ifdef __PSP__
+    sceCtrlSetSamplingCycle(10);
+    sceCtrlSetSamplingMode(PSP_CTRL_MODE_ANALOG);
+#endif
     
     shark_string *main_name = shark_string_new_from_cstr("main");
     shark_module *module = shark_vm_import_module(vm, main_name);
@@ -447,6 +467,9 @@ void shark_exec_game(shark_vm *vm)
     SHARK_CALL_METHOD("launch");
     
     bool pressed = false;
+#ifdef __PSP__
+    unsigned long last = 0;
+#endif
     
     while (true)
     {
@@ -512,9 +535,70 @@ void shark_exec_game(shark_vm *vm)
             break;
         default:
             break;
+        }
+#ifdef __PSP__
+        SceCtrlData pad;
+        
+        while (true)
+        {
+            sceCtrlReadBufferPositive(&pad, 1);
+            
+            if (pad.Buttons == last)
+                break;
+            
+            if (pad.Buttons & PSP_CTRL_CIRCLE) {
+                if (!(last & PSP_CTRL_CIRCLE))
+                    DISPATCH_EVENT(E_PRESS_X, 0, 0);
+            } else {
+                if (last & PSP_CTRL_CIRCLE)
+                    DISPATCH_EVENT(E_REL_X, 0, 0);
+            }
+            
+            if (pad.Buttons & PSP_CTRL_CROSS) {
+                if (!(last & PSP_CTRL_CROSS))
+                    DISPATCH_EVENT(E_PRESS_Y, 0, 0);
+            } else {
+                if (last & PSP_CTRL_CROSS)
+                    DISPATCH_EVENT(E_REL_Y, 0, 0);
+            }
+            
+            if (pad.Buttons & PSP_CTRL_UP) {
+                if (!(last & PSP_CTRL_UP))
+                    DISPATCH_EVENT(E_PRESS_UP, 0, 0);
+            } else {
+                if (last & PSP_CTRL_UP)
+                    DISPATCH_EVENT(E_REL_UP, 0, 0);
+            }
+            
+            if (pad.Buttons & PSP_CTRL_DOWN) {
+                if (!(last & PSP_CTRL_DOWN))
+                    DISPATCH_EVENT(E_PRESS_DOWN, 0, 0);
+            } else {
+                if (last & PSP_CTRL_DOWN)
+                    DISPATCH_EVENT(E_REL_DOWN, 0, 0);
+            }
+            
+            if (pad.Buttons & PSP_CTRL_LEFT) {
+                if (!(last & PSP_CTRL_LEFT))
+                    DISPATCH_EVENT(E_PRESS_LEFT, 0, 0);
+            } else {
+                if (last & PSP_CTRL_LEFT)
+                    DISPATCH_EVENT(E_REL_LEFT, 0, 0);
+            }
+            
+            if (pad.Buttons & PSP_CTRL_RIGHT) {
+                if (!(last & PSP_CTRL_RIGHT))
+                    DISPATCH_EVENT(E_PRESS_RIGHT, 0, 0);
+            } else {
+                if (last & PSP_CTRL_RIGHT)
+                    DISPATCH_EVENT(E_REL_RIGHT, 0, 0);
+            }
+            
+            last = pad.Buttons;
+        }
+#endif
 #undef DISPATCH_EVENT
 #undef DISPATCH_KEY
-        }
         
         PUSH(SHARK_FROM_PTR(main));
         SHARK_CALL_METHOD("update");
@@ -526,7 +610,11 @@ void shark_exec_game(shark_vm *vm)
         SDL_BlitScaled(main->display, NULL, main->window_display, NULL);
         
         SDL_UpdateWindowSurface(main->window);
+#ifndef __PSP__
         SDL_Delay(1000 / 24);
+#else
+        SDL_Delay(1000 / 24);
+#endif
     }
 #undef PUSH
 #undef SHARK_CALL_METHOD
@@ -536,26 +624,36 @@ end:
     TTF_Quit();
 }
 
-#ifdef _WIN32
+#if defined(_WIN32) || defined(__PSP__)
 int SDL_main(int argc, char **argv)
 #else
 int main(int argc, char **argv)
 #endif
 {
+#ifndef __PSP__
     if (argc == 2)
     {
+#endif
         shark_vm *vm = shark_vm_new();
+#ifdef __PSP__
+        shark_string *exec = shark_string_new_from_cstr("game");
+        shark_string *base = shark_string_new_from_cstr("./");
+#else
         shark_string *exec = shark_string_new_from_cstr(argv[0]);
         shark_string *base = shark_path_get_base(exec);
-        
+#endif
         shark_vm_add_import_path(vm, base);
         shark_init_library(vm, base);
         shark_init_game_library(vm, base);
-        
+#ifdef __PSP__
+        shark_string *gamedir = shark_string_new_from_cstr("");
+        shark_string *filename = shark_string_new_from_cstr("bin/game.shar");
+#else
         shark_string *gamedir = shark_string_new_from_cstr(argv[1]);
         shark_string *tail = shark_string_new_from_cstr("bin/game.shar");
         shark_string *filename = shark_path_join(gamedir, tail);
         shark_object_dec_ref(tail);
+#endif
         
         FILE *source = fopen(filename->data, "rb");
         
@@ -565,6 +663,10 @@ int main(int argc, char **argv)
             return -1;
         }
         
+#ifdef __PSP__
+        asset_dir = shark_string_new_from_cstr("asset");
+        save_file_name = shark_string_new_from_cstr("save");
+#else
         tail = shark_string_new_from_cstr("asset");
         asset_dir = shark_path_join(gamedir, tail);
         shark_object_dec_ref(tail);
@@ -572,17 +674,19 @@ int main(int argc, char **argv)
         tail = shark_string_new_from_cstr("save");
         save_file_name = shark_path_join(gamedir, tail);
         shark_object_dec_ref(tail);
-        
+#endif
         shark_module *module = shark_read_archive(vm, shark_path_get_tail(filename), source);
         fclose(source);
         
         shark_exec_game(vm);
         
         return 0;
+#ifndef __PSP__
     }
     else
     {
         printf("usage: %s <game-dir>", argv[0]);
         return -1;
     }
+#endif
 }

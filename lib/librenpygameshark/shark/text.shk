@@ -44,6 +44,3 @@ class font
     
     function get_height()
         return self.size
-    
-    function get_width(data)
-        return self.render(data).get_size_x()

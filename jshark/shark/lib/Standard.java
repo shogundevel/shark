@@ -1146,7 +1146,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					return Math.ceil((double) caller.stack[caller.TOS-1]);
+					return (double) Math.ceil((double) caller.stack[caller.TOS-1]);
 				}
 			};
 			
@@ -1162,7 +1162,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					return Math.floor((double) caller.stack[caller.TOS-1]);
+					return (double) Math.floor((double) caller.stack[caller.TOS-1]);
 				}
 			};
 			
@@ -1440,7 +1440,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					return String.valueOf((char) caller.stack[caller.TOS-1]);
+					return String.valueOf((char) (int) caller.stack[caller.TOS-1]);
 				}
 			};
 			
@@ -1498,7 +1498,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					char c = (char) caller.stack[caller.TOS-1];
+					char c = (char) (int) caller.stack[caller.TOS-1];
 					return c >= 'a' && c <= 'z';
 				}
 			};
@@ -1515,7 +1515,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					char c = (char) caller.stack[caller.TOS-1];
+					char c = (char) (int) caller.stack[caller.TOS-1];
 					return c >= 'A' && c <= 'Z';
 				}
 			};
@@ -1532,7 +1532,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					char c = (char) caller.stack[caller.TOS-1];
+					char c = (char) (int) caller.stack[caller.TOS-1];
 					return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
 				}
 			};
@@ -1549,7 +1549,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					char c = (char) caller.stack[caller.TOS-1];
+					char c = (char) (int) caller.stack[caller.TOS-1];
 					return c >= '0' && c <= '9';
 				}
 			};
@@ -1566,7 +1566,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					char c = (char) caller.stack[caller.TOS-1];
+					char c = (char) (int) caller.stack[caller.TOS-1];
 					return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9');
 				}
 			};
@@ -1583,7 +1583,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					char c = (char) caller.stack[caller.TOS-1];
+					char c = (char) (int) caller.stack[caller.TOS-1];
 					return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_' || (c >= '0' && c <= '9');
 				}
 			};
@@ -1600,7 +1600,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					char c = (char) caller.stack[caller.TOS-1];
+					char c = (char) (int) caller.stack[caller.TOS-1];
 					return (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F') || (c >= '0' && c <= '9');
 				}
 			};
@@ -1617,7 +1617,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					char c = (char) caller.stack[caller.TOS-1];
+					char c = (char) (int) caller.stack[caller.TOS-1];
 					return ((int) c) <= 127;
 				}
 			};
@@ -1634,7 +1634,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					return Character.isSurrogate((char) caller.stack[caller.TOS-1]);
+					return Character.isSurrogate((char) (int) caller.stack[caller.TOS-1]);
 				}
 			};
 			
@@ -1650,7 +1650,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					char c = (char) caller.stack[caller.TOS-1];
+					char c = (char) (int) caller.stack[caller.TOS-1];
 					if (c >= 'A' && c <= 'Z')
 						return c - 'A' + 'a';
 					else
@@ -1670,7 +1670,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					char c = (char) caller.stack[caller.TOS-1];
+					char c = (char) (int) caller.stack[caller.TOS-1];
 					if (c >= 'a' && c <= 'z')
 						return c - 'a' + 'A';
 					else
@@ -1690,7 +1690,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					return ((String) caller.stack[caller.TOS-2]).length();
+					return (double) ((String) caller.stack[caller.TOS-1]).length();
 				}
 			};
 			
@@ -1706,7 +1706,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					return ((String) caller.stack[caller.TOS-2]).codePointAt((int) caller.stack[caller.TOS-1]);
+					return ((String) caller.stack[caller.TOS-2]).codePointAt((int) (double) caller.stack[caller.TOS-1]);
 				}
 			};
 			
@@ -1722,7 +1722,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					return ((String) caller.stack[caller.TOS-3]).substring((int) caller.stack[caller.TOS-2], (int) caller.stack[caller.TOS-1]);
+					return ((String) caller.stack[caller.TOS-3]).substring((int) (double) caller.stack[caller.TOS-2], (int) (double) caller.stack[caller.TOS-1]);
 				}
 			};
 			
@@ -2244,7 +2244,7 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					return ((text_file) caller.stack[caller.TOS-2]).read((int) caller.stack[caller.TOS-1]);
+					return ((text_file) caller.stack[caller.TOS-2]).read((int) (double) caller.stack[caller.TOS-1]);
 				}
 			};
 			

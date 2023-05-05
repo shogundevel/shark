@@ -50,6 +50,7 @@ function main(args)
     var source = open("make", "r")
     if source == null then
         puts("no 'make' file found, operation aborted.\n")
+        return
     var buffer = new string::strbuf ()
     while not source.at_end() do
         buffer.puts(source.read(256))

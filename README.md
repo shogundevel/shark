@@ -1,30 +1,35 @@
-# The Shark SDK
-
-Welcome to the Shark SDK!
-
-This SDK is the home of the Shark (dynamic) and SharkG (static) programming languages reference implementations.
-
-The seal of identity of the SDK is the inmense portability and library compatibility of the programs it consumes and produces, being posible to integrate both languages with C/C++, Java, Python, JavaScript and Lua in the development of a wide array of applications.
-
-The kit includes two compilers (sharkc and sharkg), three interpreters (cshark, jshark and sharkemu), a command line interface (sharkenv), a makefile interpreter (sharkmake), the implementations (in many environments) of two standardized common function libraries and the implementation (also in many environments) of a standardized 2D game library.
-
 # The Shark Programming Language
 
-Shark is a dynamic language designed to provide the speed and size of Lua, while also offering the familiar syntax of Python and the ability to run in the browser.
+Welcome to the Shark programming language!
+
+Shark is a dynamically typed application programming language designed to be highly portable, efficent and easy to use.
 
 Some key features:
 * **Fast and lightweight** native virtual machine written in C
-* Small package size (50 KB) with minimal dependencies
 * Can be used in **the browser** and compiled to portable ECMAScript code
 * Includes a tiny and portable 2D game framework for small scale game development
 * Backwards compatible with Python and Lua libraries and environments by means of targeting them as compilation output
 * Official Java Virtual Machine implementation of both the VM and 2D game framework
 
+Starting with version 2.0.0 Shark features and includes its statically typed dialect SharkG!
+
+SharkG allows you to write efficent type safe code for any platform supported by the Shark SDK.
+
+Here are some key features of SharkG:
+* Portable: The reference SharkG compiler can output C, Java, Python, Lua, JavaScript and Shark code.
+* Statically Typed: Typing is static, strong and minimal. The type system can be used to write type safe code in platforms where typing is blurry or directly non-existent.
+* Pythonic: Indentation and keyword based syntax. Very straighforward semantics.
+* Efficent: Compile directly to C to achieve excellent speed and very low memory footprints.
+* Excellent Library Support: Write typed declarations to access any API available to C/C++, Java, Python, Lua, JavaScript or Shark code.
+* Low Level Access: Write device drivers, embedded systems or operating systems by inlining C and Assembly code directly.
+
+The Shark SDK is made with love by shogundevel and released under the MIT license. Included is a copy of the SDL2 C headers, modified to work properly with some versions of the Tiny C Compiler. Read the copying file for more details.
+
 ## Simple Example
 
 This example iterates the command line arguments and displays a greeting for each name it contains:
 
-```[shell]
+```[javascript]
 import system.io: printf
 
 function main(args)
@@ -32,23 +37,7 @@ function main(args)
         printf("Hello, %!", [name])
 ```
 
-# The SharkG Programming Language
-
-If you like C, Lua or Python you will be inmediately into SharkG.
-
-SharkG is a borderline minimalistic, very portable and multi-proupose programming language.
-
-Here are some key features:
-* Portable: The reference SharkG compiler can output C, Java, Python, Lua, JavaScript and Shark code.
-* Statically Typed: Typing is static, strong and minimal. The type system can be used to write type safe code in platforms where typing is blurry or directly non-existent.
-* Pythonic: Indentation and keyword based syntax. Very straighforward semantics.
-* Efficent: Compile directly to C to achieve excellent speed and very low memory footprints.
-* Excellent Library Support: Write typed declarations to access any API available to C/C++, Java, Python, Lua or JavaScript code.
-* Low Level Access: Write device drivers, embedded systems or operating systems by inlining C and Assembly code directly.
-
-## Example Program
-
-Here is a simple hello world:
+Here is a simple hello world in SharkG:
 
 ```[lua]
 
@@ -107,7 +96,19 @@ This repository contains the Shark SDK binaries and the full source code for the
 Optionally, configure your PATH variable to allow the command line find the shark toolchain. Make sure it points to the root directory of the unzipped shark distribution.
 
 Now open a command prompt, type 'shark' and hit enter, you should see something like:
-Usage: C:\shark\bin\shark.exe <filename> <args>
+Usage: C:\shark\bin\shark.exe [filename] [args]
+
+## Using sharkedit To Edit And Test Your Code
+
+SharkEdit is a Shuriken based editor that comes pre-installed with the Shark SDK since version 2.1.0
+
+SharkEdit is a baby program (written from scratch in under 0.7K lines of code) so use it with love.
+
+To start creating with SharkEdit create a new folder in your filesystem, go into it and type the following:
+> shuriken edit
+
+You can customize the editor resolution to your preference by passing it as an argument:
+> shuriken edit 1000 640
 
 ## Using sharkemu To Run Shark Code
 
@@ -161,7 +162,7 @@ First run 'sharkg' and 'sharkglink' without arguments to see their syntax.
 
 To build the compiler as a native executable use the following:
 
-> sharkg c sharkg.shg out.c include
+> sharkg c sharkg/shark_main.shg out.c include
 
 > gcc out.c lib/shark.c lib/shark_system.c lib/shark_main.c -Ilib -o test
 
@@ -169,9 +170,9 @@ To build the compiler as a native executable use the following:
 
 To build as a java executable use:
 
-> sharkg java sharkg.shg out.java include
+> sharkg java sharkg/shark_main.shg out.java include
 
-> sharkglink out.java Main.java lib/sharkgsystem.java
+> sharkglink out.java Main.java lib/sharksystem.java
 
 > mkdir classes
 
@@ -183,17 +184,17 @@ The final file (passed to the java compiler) must be named Main.java and live un
 
 To build as a python program use:
 
-> sharkg py sharkg.shg out.py include
+> sharkg py sharkg/shark_main.shg out.py include
 
-> sharkglink out.py sharkg.py lib/sharkgsystem.py
+> sharkglink out.py sharkg.py lib/sharksystem.py
 
 > python sharkg.py
 
 To build as a lua program use:
 
-> sharkg lua sharkg.shg out.lua include
+> sharkg lua sharkg/shark_main.shg out.lua include
 
-> sharkglink out.lua sharkg.lua lib/sharkgrt.lua lib/sharkgsystem.lua
+> sharkglink out.lua sharkg.lua lib/sharkrt.lua lib/sharksystem.lua
 
 > lua sharkg.lua
 
@@ -217,9 +218,11 @@ The following commands are provided by the shark SDK:
 * unlink
 * echo
 * exit
+* system
 
 The 'echo' command echoes the rest of the line to console output.
 The 'play' command enters sharkemu in eval mode.
+The 'system' command executes a command in the host system command line interface.
 
 Run the other commands without arguments to learn more about each one.
 
@@ -239,7 +242,7 @@ To run sharkmake cd to the directory containing the make file and type '> shark 
 
 You can request sharkmake to run one or more particular tags of a make file by passing their names as arguments. If no tag is specified the whole make file is executed from start to end.
 
-## Gameshark Howto (Shark)
+## Gameshark Howto
 
 To compile and run a gameshark project cd to the project's root directory and type the following commands:
 
@@ -401,16 +404,16 @@ You can build a game for HTML5 using:
 
 > sharkg js demo/tetris/src/main.shg out.js
 
-> sharkglink js out.js demo/tetris/game.js lib/sharkgsystem.js lib/sharkgame.js
+> sharkglink js out.js demo/tetris/game.js lib/sharksystem.js lib/sharkgame.js
 
 The game code must be stored in the file 'game.js' so the template html file can find it (you can use any name really, and custom html files).
 Copy the file 'lib/index.html' to 'demo/tetris/index.html' and launch the result in a browser.
 
 Building for java goes:
 
-> sharkg java demo/rotozoomer/main.shg out.java
+> sharkg java demo/rotozoomer/src/main.shg out.java
 
-> sharkglink java out.java Main.java lib/sharkgsystem.java lib/sharkgame.java
+> sharkglink java out.java Main.java lib/sharksystem.java lib/sharkgame.java
 
 Now build a .jar using a standard java compiler and place it alongside the /asset directory and you have a working java game.
 
@@ -419,6 +422,8 @@ Building native games (requires SDL2 and SDL2_ttf installed):
 > sharkg c demo/tetris/src/main.shg out.c
 
 > gcc out.c lib/shark.c lib/shark_system.c lib/shark_game.c -Ilib -w -o demo/tetris/tetris `pkg-config --libs --cflags SDL2 SDL2_ttf`
+
+There are a lot more supported platforms, but these should be enough to start coding your game.
 
 ## Implementation Details
 
@@ -480,7 +485,7 @@ function main(args: [] str)
 
 ## Next Steps
 
-Now you know basically everything needed to make full use of shark. If you need further help or want to start contributing, file an issue here on GH with your questions or suggestions.
+Now you know basically everything needed to make full use of shark. If you need further help or want to start contributing, file an issue here on github with your questions or suggestions.
 
 Cheers, <br>
 \- ShogunDevel

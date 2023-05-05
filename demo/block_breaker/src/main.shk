@@ -15,7 +15,7 @@ var black_ball = asset::load_texture("black_ball.png")
 
 var square = asset::load_texture("square.png")
 var bg = asset::load_texture("bg.png")
-var font = asset::load_font("courier_new.ttf", 12, 0x0)
+var font = asset::load_font("courier_new.ttf", 12, 255)
 var main_screen_text = "Press any button to start a new game."
 
 var W = 16
@@ -81,19 +81,27 @@ class main_activity (activity)
         else
             if type == event::E_PRESS_LEFT then
                 self.left_down = true
+                self.move_left()
             else if type == event::E_PRESS_RIGHT then
                 self.right_down = true
+                self.move_right()
             else if type == event::E_REL_LEFT then
                 self.left_down = false
             else if type == event::E_REL_RIGHT then
                 self.right_down = false
     
+    function move_left()
+        self.bar_x = math::max(self.bar_x - 8, 96)
+    
+    function move_right()
+        self.bar_x = math::min(self.bar_x + 8, 176)
+    
     function update()
         if self.in_game then
             if self.left_down then
-                self.bar_x = math::max(self.bar_x - 8, 96)
+                self.move_left()
             if self.right_down then
-                self.bar_x = math::min(self.bar_x + 8, 176)
+                self.move_right()
             self.ball_x += self.speed_x * 8
             self.ball_y += self.speed_y * 8
             if self.ball_x < 96 or self.ball_x > 216 then

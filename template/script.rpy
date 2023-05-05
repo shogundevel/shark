@@ -25,6 +25,10 @@
 ################################################################################
 
 init -1000 python:
+    SIZE_X = 640
+    SIZE_Y = 480
+    SCALE = 1
+    
     import importlib
     
     class shark_module:
@@ -225,46 +229,49 @@ init -1000 python:
             renpy.Displayable.__init__(self)
             self.child = child
             self.pressed = False
-            self.x_size = 320
-            self.y_size = 192
+            self.x_size = SIZE_X
+            self.y_size = SIZE_Y
             self.surface = None
             self.clock = pygame.time.Clock()
-            child.launch()
+            child.launch(SIZE_X, SIZE_Y)
         
         def render(self, x_size, y_size, time, anim):
             self.x_size = x_size
             self.y_size = y_size
             self.child.update()
-            self.child.display = renpy.Render(320, 192)
+            self.child.display = renpy.Render(SIZE_X, SIZE_Y)
             self.child.render()
             self.surface = cscale(self.child.display, x_size, y_size)
             self.clock.tick(24)
             renpy.redraw(self, 0)
             return self.surface
         
-        def key_event(self, event):
-            self.child.event(event, 0, 0)
+        def key_event(self, event, char):
+            self.child.event(event, 0, 0, char)
         
         def event(self, event, x, y, time):
             import pygame
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                self.pressed = True
-                self.child.event(1, x, y)
+                self.child.event(1, x, y, None)
             elif event.type == pygame.MOUSEBUTTONUP and event.button == 1:
-                self.pressed = False
-                self.child.event(3, x, y)
-            elif event.type == pygame.MOUSEMOTION and self.pressed:
-                self.child.event(2, x, y)
+                self.child.event(2, x, y, None)
+            elif event.type == pygame.MOUSEMOTION:
+                self.child.event(3, x, y, None)
             else:
                 raise renpy.IgnoreEvent()
     
+    char_set = "abcdefghijklmnopqrstuvwxyz"
+    char_digit = "0123456789"
+    char_special = " ()[]*/%+-<>=!&|^~.,;:\"'#"
+    
     def key_event(dis, key):
         def callable():
-            dis.key_event(key)
+            dis.key_event(key, None)
         return callable
 
 screen main_screen (child):
     $ display = main_display(child)
+    $ insert_symbol = lambda e, x: lambda: (e.key_event(20, x), e.key_event(21, x))[0]
     
     add display
     
@@ -281,19 +288,32 @@ screen main_screen (child):
         key "keyup_K_x" action key_event(display, 14)
         key "keyup_K_y" action key_event(display, 15)
     
-    key "keydown_K_UP" action key_event(display, 4)
-    key "keydown_K_DOWN" action key_event(display, 5)
-    key "keydown_K_LEFT" action key_event(display, 6)
-    key "keydown_K_RIGHT" action key_event(display, 7)
+    key "keydown_K_UP" action key_event(display, 6)
+    key "keydown_K_DOWN" action key_event(display, 7)
+    key "keydown_K_LEFT" action key_event(display, 8)
+    key "keydown_K_RIGHT" action key_event(display, 9)
+    key "keydown_K_RETURN" action key_event(display, 10)
+    key "keydown_K_BACKSPACE" action key_event(display, 11)
+    key "keydown_K_LCTRL" action key_event(display, 12)
     
-    key "keyup_K_UP" action key_event(display, 10)
-    key "keyup_K_DOWN" action key_event(display, 11)
-    key "keyup_K_LEFT" action key_event(display, 12)
-    key "keyup_K_RIGHT" action key_event(display, 13)
+    key "keyup_K_UP" action key_event(display, 13)
+    key "keyup_K_DOWN" action key_event(display, 14)
+    key "keyup_K_LEFT" action key_event(display, 15)
+    key "keyup_K_RIGHT" action key_event(display, 16)
+    key "keyup_K_RETURN" action key_event(display, 17)
+    key "keyup_K_BACKSPACE" action key_event(display, 18)
+    key "keyup_K_LCTRL" action key_event(display, 19)
+    
+    for char in char_set:
+        key char action insert_symbol(display, char) capture True
+        key char.upper() action insert_symbol(display, char.upper()) capture True
+    
+    for char in char_digit + char_special:
+        key char action insert_symbol(display, char) capture True
     
     key "K_ESCAPE" action Return(None)
 
 label start:
-    $ main = shark_import_module("main")
+    $ main = shark_import_module(__MAIN__)
     
     call screen main_screen(main.main_activity())

@@ -1,0 +1,130 @@
+###############################################################################
+### Copyright #################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+###############################################################################
+
+import "system/io.api"
+import "shark_path.shg"
+
+function main(args: [] str)
+    if sizeof(args) < 4 then
+        write("usage: ")
+        write(args[0])
+        write(" <target> <source> <out> <libs>\n")
+        write("\tLinks the given <filename> agains <libs> and places the result at <out>.\n")
+        write("\tTarget can be any of <py | js | lua | java | shk | rpy | txt>")
+    else
+        var base: str = shark_path_get_base(args[0])
+        if base == "" then
+            base = "."
+        var target: str = args[1]
+        var filename: str = args[2]
+        var source: FILE = open(filename, 'r')
+        
+        if source == null then
+            write("can't open <source> for reading.")
+            exit(EXIT_FAILURE)
+        
+        var out: FILE = open(args[3], 'w')
+        var buf: strbuf = new strbuf ()
+        
+        if out == null then
+            write("can't open <out> for writing.")
+            exit(EXIT_FAILURE)
+        else if target == "py" then
+            out.write("main = None\n")
+        else if target == "rpy" then
+            out.write("init -1000 python:\n")
+        else if target == "java" or target == "shk" then
+            for i: int = 4, i < sizeof(args), i++ do
+                buf.write(args[i])
+                buf.write(".import")
+                var lib: FILE = open(buf.get(), 'r')
+                if lib == null then
+                    buf.write(base)
+                    buf.write("/lib/")
+                    buf.write(args[i])
+                    buf.write(".import")
+                    lib = open(buf.get(), 'r')
+                    if lib == null then
+                        continue
+                while not lib.at_end() do
+                    out.put(lib.fetch())
+                lib.close()
+            if target == "java" then
+                out.write("public class Main {\n")
+        
+        for i: int = 4, i < sizeof(args), i++ do
+            var lib: FILE = open(args[i], 'r')
+            if lib == null then
+                buf.write(base)
+                buf.write("/lib/")
+                buf.write(args[i])
+                lib = open(buf.get(), 'r')
+                if lib == null then
+                    write("can't open lib '")
+                    write(args[i])
+                    write("' for reading.")
+                    return
+            while not lib.at_end() do
+                out.put(lib.fetch())
+            lib.close()
+        
+        if target == "rpy" then
+            out.write("    ")
+            while not source.at_end() do
+                var c: char = source.fetch()
+                out.put(c)
+                if c == '\n' then
+                    out.write("    ")
+        else
+            while not source.at_end() do
+                out.put(source.fetch())
+        
+        source.close()
+        
+        if target == "js" then
+            out.write("main ? main(process ? process.argv.slice(1, process.argv.length) : [ \"\" ]) : null;")
+            out.close()
+        else if target == "lua" then
+            out.write("arg[#arg + 1] = ''\nif main ~= nil then main(arg) end\n")
+            out.close()
+        else if target == "py" then
+            out.write("import sys\nif main: main(sys.argv)\n")
+            out.close()
+        else if target == "java" then
+            out.write("}")
+            out.close()
+        else if target == "rpy" then
+            out.write("\n")
+            out.close()
+        else if target == "shk" then
+            out.close()
+        else if target == "txt" then
+            out.close()
+        else
+            write("WARNING: can't recognize desired target '")
+            write(target)
+            write("'")
+            out.close()

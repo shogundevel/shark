@@ -9,7 +9,7 @@ import system.string: itos
 
 var square = asset::load_texture("square.png")
 var bg = asset::load_texture("bg.png")
-var font = asset::load_font("courier_new.ttf", 12, 0x0)
+var font = asset::load_font("courier_new.ttf", 12, 255)
 
 var piece_data = [[[[true, true, true, true]],
                     [[true], [true], [true], [true]]],

@@ -40,6 +40,7 @@ class renpy_generator (python_generator)
         if self.out == null then
             compiler_error(format("can't open file '%' for writing, compilation aborted.", [out_filename]))
         self.out.puts("init python:\n")
+        self.out.printf("    __MAIN__ = '%'\n", [path::remove_ext(path::get_tail(filename))])
         self.enter_module(path::remove_ext(path::get_tail(filename)))
     
     function close()

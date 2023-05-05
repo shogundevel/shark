@@ -89,6 +89,8 @@ native("exit", exit::exit)
 
 module("system.io")
 
+var systemio = current_module
+
 current_module.namespace["ERR_UNKNOWN"] = io::ERR_UNKNOWN
 current_module.namespace["ERR_FILE_NOT_FOUND"] = io::ERR_FILE_NOT_FOUND
 
