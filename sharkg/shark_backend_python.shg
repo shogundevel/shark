@@ -70,7 +70,7 @@ class shark_backend_python
         self.indent_level -= 1
     
     function write_indent()
-        for i: int = 0, i < self.indent_level, i++ do
+        for i to self.indent_level do
             self.out.write("    ")
     
     function begin(out: str)
@@ -152,10 +152,9 @@ class shark_backend_python
             self.out.write("self")
             if function_object.arg_names.size() != 0 then
                 self.out.write(", ")
-        if function_object.arg_names.size() != 0 then
-            self.out.write(cast(function_object.arg_names.get(0), str))
-        for i: int = 1, i < function_object.arg_names.size(), i++ do
-            self.out.write(", ")
+        for i to function_object.arg_names.size() do
+            if i != 0 then
+                self.out.write(", ")
             self.out.write(cast(function_object.arg_names.get(i), str))
         self.out.write("):\n")
         self.globals = new strmap ()
@@ -227,32 +226,26 @@ class shark_backend_python
     function for_init(name: str, type: shark_type)
         self.write_indent()
         self.out.write(name)
-        self.out.write(" = ")
-        self.out.write(self.exp)
-        self.out.write("\n")
+        self.out.write(" = 0\n")
+        self.step = name
     
     function for_cond()
         self.cond = self.exp
     
-    function for_step()
-        self.step = self.exp
-    
     function for_stat()
         self.write_indent()
         self.out.write("while ")
-        if self.cond != null then
-            self.out.write(self.cond)
-        else
-            self.out.write("True")
+        self.out.write(self.step)
+        self.out.write(" < ")
+        self.out.write(self.cond)
         self.out.write(":\n")
     
     function exit_for()
-        if self.step != null then
-            self.indent()
-            self.write_indent()
-            self.dedent()
-            self.out.write(self.step)
-            self.out.write("\n")
+        self.indent()
+        self.write_indent()
+        self.dedent()
+        self.out.write(self.step)
+        self.out.write("+= 1\n")
         self.step = cast(self.call_stack.pop(), str)
     
     function break_stat()
@@ -360,11 +353,10 @@ class shark_backend_python
         self.exp = self.buf.get()
     
     function write_args()
-        if self.call_args.size() != 0 then
-            self.buf.write(cast(self.call_args.get(0), str))
-            for i: int = 1, i < self.call_args.size(), i++ do
+        for i to self.call_args.size() do
+            if i != 0 then
                 self.buf.write(", ")
-                self.buf.write(cast(self.call_args.get(i), str))
+            self.buf.write(cast(self.call_args.get(i), str))
     
     function enter_call()
         self.call_stack.push(self.exp_left)

@@ -105,6 +105,24 @@ class shark_backend
     function close_else_if()
         shark_null_stat()
     
+    function enter_select()
+        shark_null_stat()
+    
+    function select_stat()
+        shark_null_stat()
+    
+    function enter_select_case(value: str)
+        shark_null_stat()
+    
+    function exit_select_case()
+        shark_null_stat()
+    
+    function enter_select_else()
+        shark_null_stat()
+    
+    function exit_select()
+        shark_null_stat()
+    
     function enter_while()
         shark_null_stat()
     

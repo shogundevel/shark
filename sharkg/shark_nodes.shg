@@ -90,7 +90,7 @@ class shark_custom_type
         self.methods = new list ()
         self.constructor = null
         if parent != null then
-            for i: int = 0, i < parent.namespace.data.size(), i++ do
+            for i to parent.namespace.data.size() do
                 var value: object = parent.namespace.data.get(i)
                 self.namespace.add(shark_object_get_name(value), value)
             self.constructor = parent.constructor

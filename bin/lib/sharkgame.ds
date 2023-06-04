@@ -1,4 +1,6 @@
 
+cfg.No_Dom;
+
 var display = null;
 var display_scale_x = 1.0;
 var display_scale_y = 1.0;
@@ -12,17 +14,31 @@ function OnStart()
     display_scale_y = app.GetDisplayHeight() / 192;
     display.SetTextSize(12 * display_scale_x);
     display.SetPaintColor("#FF000000");
-    // image.SetOnTouch(touch_callback)
+    display.SetOnTouch(function (ev) {
+        var x = ev.x[0] * 320;
+        var y = ev.y[0] * 192;
+        if (ev.action == "Down") event(E_PRESS, x, y);
+        else if (ev.action == "Move") event(E_MOVE, x, y);
+        else if (ev.action == "Up") event(E_RELEASE, x, y);
+    });
     display.SetAutoUpdate(false)
     layout.AddChild(display)
     app.AddLayout(layout)
     
     launch();
     
+    var update_timer = 0;
+    
     function update_game()
     {
         update();
-        render();
+        if (update_timer == 1) {
+            display.Clear();
+            update_timer = 0;
+            render();
+        } else {
+            update_timer++;
+        }
         display.Update();
     }
     

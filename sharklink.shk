@@ -41,13 +41,14 @@ function main(args)
     if sizeof(args) < 5 then
         printf("usage % <target> <source> <main> <out> <args>\n", [args[0]])
         puts("\tLinks the listed <args> against <source> and outputs an executable program.")
-        puts("\t<target> may be any of <c | co | py | pyo | js | as | lua | luao>, behavior depends on the selected target:\n")
+        puts("\t<target> may be any of <c | co | py | pyo | js | as | ds | lua | luao>, behavior depends on the selected target:\n")
         puts("\t\tc: generates a cshark bytecode archive file with import declarations for each library listed in <args>. <args> should contain only library names, not direct filenames. The output executable depends on the listed libraries to run.\n")
         puts("\t\tco: generates a self-contained cshark bytecode executable archive by embedding each file listed in <args>. <args> should contain file paths to the required libraries. The output executable is dependency free.\n")
         puts("\t\tpy: generates a python file with import statements for the shark runtime (sharkrt.py) and each library listed in <args>. <args> should contain only library names, not direct filenames. The output executable depends on sharkrt.py and the listed libraries to run.\n")
         puts("\t\tpyo: generates a self-contained python executable by embedding the shark runtime (sharkrt.py) and each file listed in <args>. <args> should contain file paths to the required libraries. The output executable is dependency free.\n")
         puts("\t\tjs: generates a self-contained javascript executable by embedding the shark runtime (sharkrt.js) and each file listed in <args>. <args> should contain file paths to the required libraries. The output executable is dependency free.\n")
         puts("\t\tas: generates an actionscript executable by embedding the shark runtime (sharkrt.as) and each file listed in <args>. <args> should contain file paths to the required libraries. The output requires more steps to become executable, listed in the 'guide' file that should come with this program.\n")
+        puts("\t\tds: generates a droidscript executable by embedding the shark runtime (sharkrt.ds) and each file listed in <args>. <args> should contain file paths to the required libraries. The output requires more steps to become executable, listed in the 'guide' file that should come with this program.\n")
         puts("\t\tlua: generates a lua file with require calls for the shark runtime (sharkrt.lua) and each library listed in <args>. <args> should contain only library names, not direct filenames. The output executable depends on sharkrt.lua and the listed libraries to run.\n")
         puts("\t\tluao: generates a self-contained lua executable by embedding the shark runtime (sharkrt.lua) and each file listed in <args>. <args> should contain file paths to the required libraries. The output executable is dependency free.\n")
         puts("\t<source> must point to the code file that must be linked.\n")
@@ -109,6 +110,11 @@ function main(args)
         out.puts("var main = __shark_rt_import('main');\n")
         out.puts("current_child = new main.main_activity ();\n")
         out.puts("current_child.launch()")
+    else if target == "ds" then
+        fread(fopen(join(base, "rt/sharkrt.ds"), "r"), out)
+        for lib in link do
+            fread(fopen(lib, "r"), out)
+        fread(source, out)
     else if target == "lua" then
         out.puts("require('sharkrt')\n")
         for lib in link do

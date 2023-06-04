@@ -24,46 +24,38 @@
 ## 
 ################################################################################
 
-var current_object
-var objects
-var prev_objects
+function copy(object)
+    var copy = [ ]
+    for value in object do
+        copy << value
+    return copy
 
-class activity
-    function init()
-        pass
-    
-    function draw(text, x, y)
-        var object_id = sizeof(objects)
-        var object = null
-        if object_id >= sizeof(prev_objects) then
-            object = current_object.createEmptyMovieClip("new_movie", current_object.getNextHighestDepth())
-            prev_objects.push(object)
-        else
-            object = prev_objects[object_id]
-        objects.push(object)
-        object.beginBitmapFill(text.data)
-        object.lineTo(text.get_size_x(), 0)
-        object.lineTo(text.get_size_x(), text.get_size_y())
-        object.lineTo(0, text.get_size_y())
-        object.lineTo(0, 0)
-        object.endFill()
-        object._x = x
-        object._y = y
-    
-    function draw_ex(text, x, y, origin_x, origin_y, rotation, scale_x, scale_y)
-        pass
-    
-    function draw_text(text, font, x, y)
-        pass
-    
-    function launch()
-        pass
-    
-    function event(type, x, y)
-        pass
-    
-    function update()
-        pass
-    
-    function render()
-        pass
+function slice(list, start, end)
+    var slice = [ ]
+    for index in range(start, end) do
+        slice << list[index]
+    return slice
+
+function pop(list)
+    return list.pop()
+
+function popindex(list, index)
+    var value = list[index]
+    list.splice(index, 1)
+    return value
+
+function find(list, value)
+    for index in range(sizeof(list)) do
+        if list[index] == value then
+            return index
+    return -1
+
+function concat(list, other)
+    return list.concat(other)
+
+function extend(list, other)
+    for value in other do
+        list << value
+
+function remove(table, index)
+function update(table, other)

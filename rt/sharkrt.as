@@ -25,6 +25,7 @@
 ******************************************************************************/
 
 import flash.display.BitmapData;
+import flash.geom.Rectangle;
 
 var __shark_rt_imports = { };
 var __shark_rt_modules = { };
@@ -45,6 +46,10 @@ var current_child = null;
 
 var objects = [ ];
 var prev_objects = [ ];
+
+var text_label = this.createTextField("text_label", this.getNextHighestDepth(), 0, 0, 320, 24);
+var text_data = new BitmapData (320, 24, true, 0);
+var text_rect = new Rectangle (0, 0, 320, 24);
 
 var E_NONE = 0;
 var E_PRESS = 1;

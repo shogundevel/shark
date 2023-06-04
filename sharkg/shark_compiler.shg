@@ -222,7 +222,7 @@ class shark_compiler
             var filename: str = null
             var source: FILE = null
             
-            for i: int = 0, i < self.include.size(), i++ do
+            for i to self.include.size() do
                 filename = shark_path_join(cast(self.include.get(i), str), import_path)
                 source = open(filename, 'r')
                 if source != null then
@@ -511,7 +511,7 @@ class shark_compiler
                     self.error()
                 self.backend.enter_function(func)
                 var context: shark_namespace = new shark_namespace (null)
-                for i: int = 0, i < self.arg_names.size(), i++ do
+                for i to self.arg_names.size() do
                     context.add(cast(self.arg_names.get(i), str),
                         new shark_variable (cast(self.arg_names.get(i), str),
                             cast(self.arg_types.get(i), shark_type)))
@@ -540,7 +540,7 @@ class shark_compiler
     function function_equals(xargs: list, yargs: list, xtype: shark_type, ytype: shark_type) -> bool
         if xargs.size() != yargs.size() then
             return false
-        for i: int = 0, i < xargs.size(), i++ do
+        for i to xargs.size() do
             if not cast(xargs.get(i), shark_type).equals(cast(yargs.get(i), shark_type)) then
                 return false
         return xtype == ytype or (xtype != null and xtype.equals(ytype))
@@ -597,6 +597,25 @@ class shark_compiler
             else
                 self.backend.close_if()
             return true
+        else if self.match("select") then
+            self.backend.enter_select()
+            self.exp()
+            self.eol()
+            if self.exp_type != shark_basic_type_int then
+                self.write_error("expected an integer in select statement.")
+                self.error()
+            self.backend.select_stat()
+            while self.match("case") do
+                var case_value: str = self.consume("int")
+                self.expect("do")
+                self.backend.enter_select_case(case_value)
+                self.block()
+                self.backend.exit_select_case()
+            if self.match("else") then
+                self.backend.enter_select_else()
+                self.block()
+            self.backend.exit_select()
+            return true
         else if self.match("while") then
             self.backend.enter_while()
             self.exp()
@@ -614,31 +633,18 @@ class shark_compiler
         else if self.match("for") then
             self.backend.enter_for()
             var context: shark_namespace = new shark_namespace (self.context)
-            var name: str = null
-            var type: shark_type = null
-            if not self.match(",") then
-                name = self.consume("name")
-                self.expect(":")
-                type = self.type()
-                self.expect("=")
-                self.exp()
-                if not type.get_cast(self.exp_type) then
-                    self.write_error("invalid initializer.")
-                    self.error()
-                self.expect(",")
-                context.add(name, new shark_variable (name, type))
-                self.backend.for_init(name, type)
+            var name: str = self.consume("name")
+            var type: shark_type = shark_basic_type_int
+            self.expect("to")
+            context.add(name, new shark_variable (name, type))
+            self.backend.for_init(name, type)
             self.context = context
-            if not self.match(",") then
-                self.exp()
-                if self.exp_type != shark_basic_type_bool then
-                    self.write_error("expected a boolean value as predicate.")
-                    self.error()
-                self.expect(",")
-                self.backend.for_cond()
-            if self.token.value != "do" then
-                self.assign()
-                self.backend.for_step()
+            self.exp()
+            self.backend.for_cond()
+            if not type.get_cast(self.exp_type) then
+                self.write_error("invalid target expression in for loop.")
+                self.error()
+            self.backend.for_step()
             self.backend.for_stat()
             self.expect("do")
             var prev_in_loop: bool = self.in_loop

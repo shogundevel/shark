@@ -242,13 +242,13 @@ To run sharkmake cd to the directory containing the make file and type '> shark 
 
 You can request sharkmake to run one or more particular tags of a make file by passing their names as arguments. If no tag is specified the whole make file is executed from start to end.
 
-## Gameshark Howto
+## SharkGame Howto
 
-To compile and run a gameshark project cd to the project's root directory and type the following commands:
+To compile and run a SharkGame project cd to the project's root directory and type the following commands:
 
 > shark tool build src/main.shk bin/game.shar
 
-> gameshark ./
+> sharkgame ./
 
 The first command builds the game binary and the second executes it.
 
@@ -284,7 +284,7 @@ To link your program against the system library copy the generated out/system.py
 
 > shark tool link py my-python-object.py main my-python-program.py system.py
 
-To run a GS based game in python you will need to install the pygame library, compile the pygameshark library from source and link it 'correctly' against your game code.
+To run a GS based game in python you will need to install the pygame library, compile the pysharkgame library from source and link it 'correctly' against your game code.
 
 First install pygame:
 
@@ -296,9 +296,9 @@ Next cd to the shark SDK root directory and type...
 
 ...to build the system library and...
 
-> shark tool compile py lib/libpygameshark/shark.shk out/shark.py
+> shark tool compile py lib/libpysharkgame/shark.shk out/shark.py
 
-...to build the gameshark library.
+...to build the sharkgame library.
 
 Now cd to your game's root directory and type:
 
@@ -326,11 +326,11 @@ var console
 
 console::log("Hi.")
 
-To run a GS based game in HTML5 you will need to compile the htmlgameshark library from source and link it 'correctly' against your game code.
+To run a GS based game in HTML5 you will need to compile the htmlsharkgame library from source and link it 'correctly' against your game code.
 
-First cd to the shark SDK root directory and type the following to build the gameshark library:
+First cd to the shark SDK root directory and type the following to build the sharkgame library:
 
-> shark tool compile js lib/libhtmlgameshark/shark.shk out/shark.js
+> shark tool compile js lib/libhtmlsharkgame/shark.shk out/shark.js
 
 Now cd to your game's root directory and type:
 
@@ -382,11 +382,11 @@ To link your program against the system library copy the generated out/system.lu
 
 To port a GS game to Ren'Py start by launching renpy and creating a new empty project, then replace the generated 'game/script.rpy' with the file 'template/script.rpy' found in the shark SDK directory.
 
-Next compile the shark system library and the 'renpygameshark' library using the 'rpy' target of the compiler:
+Next compile the shark system library and the 'renpysharkgame' library using the 'rpy' target of the compiler:
 
 > shark tool compile rpy lib/libpythonsystem/system.shk out/system.rpy
 
-> shark tool compile rpy lib/librenpygameshark/shark.shk out/shark.rpy
+> shark tool compile rpy lib/librenpysharkgame/shark.shk out/shark.rpy
 
 Copy those files to your game's directory and you've got a basic renpy environment to run your game code.
 
@@ -396,7 +396,7 @@ Now, to compile your game to renpy source code cd to your game's root directory 
 
 Now copy the generated bin/game.rpy along with your game's /asset folder to your renpy game's directoy, and that's it. Launch your game to test it.
 
-## Gameshark Howto (SharkG)
+## SharkGame Howto (SharkG)
 
 Building a game using the sharkgame library is not hard. All games should have an /asset directory to store images and fonts, the game executable is usually finding that directory by assuming it's placed in the same directory where it got called.
 

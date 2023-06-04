@@ -55,8 +55,8 @@ function main(args: [] str)
         var include: list = new list ()
         include.push(shark_path_join(root, "include"))
         include.push(shark_path_get_base(filename))
-        for i: int = 4, i < sizeof(args), i++ do
-            include.push(args[i])
+        for i to sizeof(args) - 4 do
+            include.push(args[4 + i])
         var backend: shark_backend = null
         if target == "c" then
             backend = new shark_backend_c ()

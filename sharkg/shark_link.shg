@@ -57,7 +57,8 @@ function main(args: [] str)
         else if target == "rpy" then
             out.write("init -1000 python:\n")
         else if target == "java" or target == "shk" then
-            for i: int = 4, i < sizeof(args), i++ do
+            var i: int = 4
+            while i < sizeof(args) do
                 buf.write(args[i])
                 buf.write(".import")
                 var lib: FILE = open(buf.get(), 'r')
@@ -72,10 +73,12 @@ function main(args: [] str)
                 while not lib.at_end() do
                     out.put(lib.fetch())
                 lib.close()
+                i++
             if target == "java" then
                 out.write("public class Main {\n")
         
-        for i: int = 4, i < sizeof(args), i++ do
+        var i: int = 4
+        while i < sizeof(args) do
             var lib: FILE = open(args[i], 'r')
             if lib == null then
                 buf.write(base)
@@ -90,6 +93,7 @@ function main(args: [] str)
             while not lib.at_end() do
                 out.put(lib.fetch())
             lib.close()
+            i++
         
         if target == "rpy" then
             out.write("    ")

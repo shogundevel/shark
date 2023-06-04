@@ -48,7 +48,7 @@ import java.io.IOException;
 import javax.imageio.ImageIO;
 import javax.swing.Timer;
 
-public class GameShark {
+public class SharkGame {
     public static int SIZE_X = 320;
     public static int SIZE_Y = 192;
     
@@ -493,7 +493,7 @@ public class GameShark {
         
         public Main(VirtualMachine vm, Activity main)
         {
-            super("GameShark");
+            super("SharkGame");
             
             machine = vm;
             child = main;
@@ -637,7 +637,7 @@ public class GameShark {
 	{
 		if (args.length == 1) {
 			Standard.load();
-            GameShark.load();
+            SharkGame.load();
 			VirtualMachine vm = new VirtualMachine ();
 			try {
                 asset_path = Standard.path_join(args[0], "asset");
@@ -675,7 +675,7 @@ public class GameShark {
 				return;
 			}
 		} else {
-			System.out.println("Usage: gameshark <path/to/game>");
+			System.out.println("Usage: sharkgame <path/to/game>");
 		}
 	}
 }

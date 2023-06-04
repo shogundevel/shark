@@ -41,6 +41,9 @@ class main_activity (activity)
         self.left_down = false
         self.right_down = false
         self.down_down = false
+        self.touch_x = 0
+        self.touch_y = 0
+        self.touch_w = false
         self.event_time = 0
     
     function new_game()
@@ -84,6 +87,26 @@ class main_activity (activity)
             self.down_down = false
         else if type == event::E_PRESS_UP then
             self.rotate()
+        else if type == event::E_PRESS then
+            self.touch_w = true
+            self.touch_x = x
+            self.touch_y = y
+        else if type == event::E_RELEASE then
+            if self.touch_x == x and self.touch_y == y then
+                self.rotate()
+            self.touch_w = false
+        else if type == event::E_MOVE then
+            var move_x = x - self.touch_x
+            var move_y = y - self.touch_y
+            if move_x < -16 then
+                self.move(-1, 0)
+                self.touch_x -= 16
+            else if move_x > 16 then
+                self.move(1, 0)
+                self.touch_x += 16
+            else if move_y > 16 then
+                self.move(0, 1)
+                self.touch_y += 16
     
     function update()
         self.current_time += 1

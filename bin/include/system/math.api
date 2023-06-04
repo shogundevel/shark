@@ -1,0 +1,66 @@
+###############################################################################
+### Copyright #################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+###############################################################################
+
+# a library of mathematical constants and functions
+# unless otherwise noted, all functions behave as expected
+
+var pi: float
+var e: float
+
+# converts int to float
+function real(x: int) -> float
+
+# portable integer division
+function idiv(x: int, y: int) -> int
+
+function abs(x: float) -> float
+
+function acos(x: float) -> float
+function asin(x: float) -> float
+function atan(x: float) -> float
+function atan2(y: float, x: float) -> float
+
+function cos(x: float) -> float
+function cosh(x: float) -> float
+function sin(x: float) -> float
+function sinh(x: float) -> float
+function tan(x: float) -> float
+function tanh(x: float) -> float
+
+function exp(x: float) -> float
+function log(x: float) -> float
+function log10(x: float) -> float
+function pow(x: float, y: float) -> float
+function sqrt(x: float) -> float
+
+function ceil(x: float) -> int
+function floor(x: float) -> int
+
+function min(x: float, y: float) -> float
+function max(x: float, y: float) -> float
+
+# returns a pseudo-random value in the range 0 to 'x'
+function random(x: int) -> int

@@ -672,7 +672,7 @@ shark_type_FILE shark_lib_open(shark_str filename, shark_char mode)
         exit(-1);
     }
 
-    char open_mode[] = { mode, '\0' };
+    char open_mode[] = { mode, 'b', '\0' };
     FILE *stream = fopen(filename->data, open_mode);
 
     if (stream == NULL)

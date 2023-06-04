@@ -103,7 +103,11 @@ public class ModuleReader
 				value = Double.parseDouble(fetch_str());
 				break;
 			case CONST_CHAR:
-				value = fetch_str().charAt(0);
+                int size = fetch_int();
+                if (size == 1)
+                    value = (char) source.read();
+                else
+                    throw new RuntimeError ("can't decode non-ascii character.");
 				break;
 			case CONST_STR:
 			case CONST_SYMBOL:

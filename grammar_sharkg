@@ -28,6 +28,7 @@ top level
 source_file = { decl }
 
 decl = import
+     | define
      | class
      | var
      | function
@@ -74,7 +75,9 @@ block = statement | indented_block
 indented_block = SEOL indent { var | statement } dedent
 
 statement = if
+          | select
           | while
+          | do_while
           | for
           | simple_statement
 
@@ -82,25 +85,28 @@ conditional branches
 --------------------
 
 if = "if" exp "then" block [ "else" ( if | block ) ]
+select = "select" exp EOL { "case" int_lit "do" block } [ "else" block ]
 
 loops
 -----
 
 while = "while" exp "do" block
-for = "for" init ',' [ exp ] ',' [ assign ] "do" block
-init = [ name ':' type '=' exp ]
+do_while = "do" block "while" exp EOL
+for = "for" name "to" exp "do" block
 
 simple statements
 -----------------
 
 simple_statement = break
                  | continue
+                 | delete
                  | return
                  | assign_stat
 
 break = "break" EOL
 continue = "continue" EOL
 
+delete = "delete" exp EOL
 return = "return" [ exp ] EOL
 
 assign_stat = assign EOL

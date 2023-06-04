@@ -7,8 +7,8 @@ cd ../
 rmdir /S /Q temp
 
 mkdir temp
-javac -d temp -sourcepath jshark jshark/GameShark.java
+javac -d temp -sourcepath jshark jshark/SharkGame.java
 cd temp
-jar cfe ../bin/jgameshark.jar GameShark *
+jar cfe ../bin/jsharkgame.jar SharkGame *
 cd ../
 rmdir /S /Q temp

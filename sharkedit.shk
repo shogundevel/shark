@@ -315,13 +315,13 @@ class main_activity (activity)
         self.filename = filename
         while not file.at_end() do
             buf.puts(file.read(256))
+        file.close()
         self.data = string::split(buf.read_all(), '\n')
         for index in range(sizeof(self.data)) do
             if string::len(self.data[index]) == 0 then
                 continue
             if string::index(self.data[index], string::len(self.data[index]) - 1) == '\r' then
                 self.data[index] = string::slice(self.data[index], 0, string::len(self.data[index]) - 1)
-        file.close()
     
     function save()
         if self.filename != null then
@@ -481,6 +481,8 @@ class main_activity (activity)
         self.dirty = true
     
     function color_line(data)
+        if data == "" then
+            return
         var tokens = [ ]
         var data_size = 0
         for token in tokenize(data) do

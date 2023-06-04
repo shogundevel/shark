@@ -288,7 +288,7 @@ typedef enum {
 
 static void shark_init_game_library(shark_vm *vm, shark_string *library_path)
 {
-    shark_string *shark_archive_tail = shark_string_new_from_cstr("gameshark.shar");
+    shark_string *shark_archive_tail = shark_string_new_from_cstr("sharkgame.shar");
     shark_string *shark_archive_name = shark_path_join(library_path, shark_archive_tail);
     
     FILE *shark_archive = fopen(shark_archive_name->data, "rb");

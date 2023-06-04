@@ -38,7 +38,7 @@ var shark_lexer_keywords_map: strmap = null
 function shark_lexer_init_keywords()
     shark_lexer_keywords_map = shark_lexer_keywords_map
     if shark_lexer_keywords_map == null then
-        shark_lexer_keywords_list = new [35] str
+        shark_lexer_keywords_list = new [36] str
         shark_lexer_keywords_list[0] = "import"
         shark_lexer_keywords_list[1] = "define"
         shark_lexer_keywords_list[2] = "class"
@@ -74,9 +74,10 @@ function shark_lexer_init_keywords()
         shark_lexer_keywords_list[32] = "true"
         shark_lexer_keywords_list[33] = "false"
         shark_lexer_keywords_list[34] = "inline"
+        shark_lexer_keywords_list[35] = "to"
         
         shark_lexer_keywords_map = new strmap ()
-        for i: int = 0, i < sizeof(shark_lexer_keywords_list), i++ do
+        for i to sizeof(shark_lexer_keywords_list) do
             shark_lexer_keywords_map.set(shark_lexer_keywords_list[i], i)
 
 class shark_lexer
@@ -221,7 +222,7 @@ class shark_lexer
         else if self.post_indent then
             self.post_indent = false
             return self.token
-        for ,, do
+        while true do
             var c: char = self.next()
             if c == ' ' or c == '\t' or c == '\r' then
                 continue

@@ -7,7 +7,7 @@ find_package(SDL2 REQUIRED)
 find_package(SDL2_ttf REQUIRED)
 find_package(SDL2_image REQUIRED)
 
-add_executable(${PROJECT_NAME} gameshark.c)
+add_executable(${PROJECT_NAME} sharkgame.c)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${SDL2_INCLUDE_DIRS})
 

@@ -1,0 +1,7 @@
+
+import system.exit: exit, SUCCESS, FAILURE
+import system.error: ERR_NONE, ERR_UNKNOWN, get_err, set_err, clear_err
+import system.string: ERR_INVALID_LITERAL, stoi, stof, itos, ftos, islower, isupper, tolower, toupper, isalpha, isdigit, isalnum, isident
+import system.string
+import system.util
+import system.io: ERR_FILE_NOT_FOUND, text_file, open, puts

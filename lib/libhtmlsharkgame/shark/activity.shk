@@ -35,19 +35,29 @@ var pressed = false
 
 function on_mouse_down(ev)
     pressed = true
-    main.event(event::E_PRESS, ev.screenX / 3, ev.screenY / 3)
+    if ev.clientX then
+        main.event(event::E_PRESS, ev.clientX / 3, ev.clientY / 3)
+    else
+        main.event(event::E_PRESS, ev.screenX / 3, ev.screenY / 3)
 
 function on_mouse_up(ev)
     pressed = false
-    main.event(event::E_RELEASE, ev.screenX / 3, ev.screenY / 3)
+    if ev.clientX then
+        main.event(event::E_RELEASE, ev.clientX / 3, ev.clientY / 3)
+    else
+        main.event(event::E_RELEASE, ev.screenX / 3, ev.screenY / 3)
 
 function on_mouse_move(ev)
     if pressed then
-        main.event(event::E_MOVE, ev.screenX / 3, ev.screenY / 3)
+        if ev.clientX then
+            main.event(event::E_MOVE, ev.clientX / 3, ev.clientY / 3)
+        else
+            main.event(event::E_MOVE, ev.screenX / 3, ev.screenY / 3)
 
 var console
 
 function on_key_down(ev)
+    # ev.code
     if ev.code == "ArrowUp" then
         main.event(event::E_PRESS_UP, 0, 0)
     else if ev.code == "ArrowDown" then
@@ -60,8 +70,25 @@ function on_key_down(ev)
         main.event(event::E_PRESS_X, 0, 0)
     else if ev.code == "KeyX" then
         main.event(event::E_PRESS_Y, 0, 0)
+    # ev.keyCode
+    else if ev.keyCode == 38 then
+        main.event(event::E_PRESS_UP, 0, 0)
+    else if ev.keyCode == 40 then
+        main.event(event::E_PRESS_DOWN, 0, 0)
+    else if ev.keyCode == 37 then
+        main.event(event::E_PRESS_LEFT, 0, 0)
+    else if ev.keyCode == 39 then
+        main.event(event::E_PRESS_RIGHT, 0, 0)
+    else if ev.keyCode == 90 then
+        main.event(event::E_PRESS_X, 0, 0)
+    else if ev.keyCode == 88 then
+        main.event(event::E_PRESS_Y, 0, 0)
+    else
+        return
+    ev.preventDefault()
 
 function on_key_up(ev)
+    # ev.code
     if ev.code == "ArrowUp" then
         main.event(event::E_REL_UP, 0, 0)
     else if ev.code == "ArrowDown" then
@@ -74,6 +101,22 @@ function on_key_up(ev)
         main.event(event::E_REL_X, 0, 0)
     else if ev.code == "KeyX" then
         main.event(event::E_REL_Y, 0, 0)
+    # ev.keyCode
+    else if ev.keyCode == 38 then
+        main.event(event::E_REL_UP, 0, 0)
+    else if ev.keyCode == 40 then
+        main.event(event::E_REL_DOWN, 0, 0)
+    else if ev.keyCode == 37 then
+        main.event(event::E_REL_LEFT, 0, 0)
+    else if ev.keyCode == 39 then
+        main.event(event::E_REL_RIGHT, 0, 0)
+    else if ev.keyCode == 90 then
+        main.event(event::E_REL_X, 0, 0)
+    else if ev.keyCode == 88 then
+        main.event(event::E_REL_Y, 0, 0)
+    else
+        return
+    ev.preventDefault()
 
 var window
 
@@ -82,6 +125,8 @@ class activity
         var element = document.getElementById("screen")
         self.context = element.getContext("2d")
         self.context.scale(3, 3)
+        self.context.textColor = "#000000FF"
+        self.context.textBaseline = "top"
         window.addEventListener("mousedown", on_mouse_down, false)
         window.addEventListener("mouseup", on_mouse_up, false)
         window.addEventListener("mousemove", on_mouse_move, false)
@@ -107,7 +152,7 @@ class activity
             pending_draw_op << [text, font, x, y]
     
     function __do_draw(text, x, y)
-        self.context.drawImage(text.image_data, x, u)
+        self.context.drawImage(text.image_data, x, y)
     
     function __do_draw_ex(text, x, y, origin_x, origin_y, rotation, scale_x, scale_y)
         self.context.save()

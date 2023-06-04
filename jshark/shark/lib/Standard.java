@@ -1795,7 +1795,10 @@ public class Standard
 			function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {
-					return ((String) caller.stack[caller.TOS-2]).split(String.valueOf((char) caller.stack[caller.TOS-1]));
+                    Array data = new Array ();
+                    for (String value : ((String) caller.stack[caller.TOS-2]).split(String.valueOf((char) caller.stack[caller.TOS-1])))
+                        data.add(value);
+					return data;
 				}
 			};
 			

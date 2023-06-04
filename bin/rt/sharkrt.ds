@@ -1,0 +1,98 @@
+/******************************************************************************
+*** Copyright *****************************************************************
+** 
+** Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+** 
+** Permission is hereby granted, free of charge, to any person
+** obtaining a copy of this software and associated documentation files
+** (the "Software"), to deal in the Software without restriction,
+** including without limitation the rights to use, copy, modify, merge,
+** publish, distribute, sublicense, and/or sell copies of the Software,
+** and to permit persons to whom the Software is furnished to do so,
+** subject to the following conditions:
+** 
+** The above copyright notice and this permission notice shall be
+** included in all copies or substantial portions of the Software.
+** 
+** THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+** EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+** MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+** IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+** CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+** TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+** SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+** 
+******************************************************************************/
+
+cfg.No_Dom;
+
+var __shark_rt_imports = { };
+var __shark_rt_modules = { };
+
+function __shark_rt_import(module)
+{
+    if (__shark_rt_imports[module] != undefined) {
+        return __shark_rt_imports[module];
+    } else if (__shark_rt_modules[module] != undefined) {
+        return __shark_rt_modules[module]();
+    } else {
+        throw "can't resolve import '" + module + "'.";
+    }
+}
+
+var display = null;
+var display_scale_x = 1.0;
+var display_scale_y = 1.0;
+
+var current_child = null;
+
+function OnStart()
+{
+    app.SetOrientation("Landscape");
+    var layout = app.CreateLayout("Linear");
+    display = app.CreateImage(null, 1, 1, "alias", 320, 192)
+    display_scale_x = app.GetDisplayWidth() / 320;
+    display_scale_y = app.GetDisplayHeight() / 192;
+    display.SetTextSize(12 * display_scale_x);
+    display.SetPaintColor("#FF000000");
+    display.SetOnTouch(function (ev) {
+        var x = ev.x[0] * 320;
+        var y = ev.y[0] * 192;
+        if (ev.action == "Down") current_child.event(E_PRESS, x, y);
+        else if (ev.action == "Move") current_child.event(E_MOVE, x, y);
+        else if (ev.action == "Up") current_child.event(E_RELEASE, x, y);
+    });
+    display.SetAutoUpdate(false)
+    layout.AddChild(display)
+    app.AddLayout(layout)
+    
+    var main = __shark_rt_import('main');
+    current_child = new main.main_activity ();
+    current_child.launch();
+    
+    function update_game()
+    {
+        current_child.update();
+        current_child.render();
+        display.Update();
+    }
+    
+    app.Animate(update_game, 24);
+}
+
+var E_NONE = 0;
+var E_PRESS = 1;
+var E_MOVE = 2;
+var E_RELEASE = 3;
+var E_PRESS_UP = 4;
+var E_PRESS_DOWN = 5;
+var E_PRESS_LEFT = 6;
+var E_PRESS_RIGHT = 7;
+var E_PRESS_X = 8;
+var E_PRESS_Y = 9;
+var E_REL_UP = 10;
+var E_REL_DOWN = 11;
+var E_REL_LEFT = 12;
+var E_REL_RIGHT = 13;
+var E_REL_X = 14;
+var E_REL_Y = 15;
