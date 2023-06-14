@@ -1,0 +1,48 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+var E_NONE: int = 0
+var E_PRESS: int = 1
+var E_RELEASE: int = 2
+var E_MOVE: int = 3
+var E_ROLL_UP: int = 4
+var E_ROLL_DOWN: int = 5
+var E_PRESS_UP: int = 6
+var E_PRESS_DOWN: int = 7
+var E_PRESS_LEFT: int = 8
+var E_PRESS_RIGHT: int = 9
+var E_PRESS_ENTER: int = 10
+var E_PRESS_BACK: int = 11
+var E_PRESS_CONTROL: int = 12
+var E_REL_UP: int = 13
+var E_REL_DOWN: int = 14
+var E_REL_LEFT: int = 15
+var E_REL_RIGHT: int = 16
+var E_REL_ENTER: int = 17
+var E_REL_BACK: int = 18
+var E_REL_CONTROL: int = 19
+var E_TEXT_DOWN: int = 20
+var E_TEXT_UP: int = 21

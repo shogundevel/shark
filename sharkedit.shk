@@ -203,6 +203,7 @@ class main_activity (activity)
         self.copy_buf = ""
         self.lineno_data = [ ]
         self.render_data = [ ]
+        self.empty_line = render_text("", font, color_text)
         for _ in range(self.line_count) do
             self.lineno_data << sample
             self.render_data << sample
@@ -482,7 +483,7 @@ class main_activity (activity)
     
     function color_line(data)
         if data == "" then
-            return
+            return self.empty_line
         var tokens = [ ]
         var data_size = 0
         for token in tokenize(data) do

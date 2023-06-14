@@ -151,6 +151,12 @@ SHARK_NATIVE(render_text)
     if (render_text == NULL)
         render_text = SDL_CreateRGBSurface(0, 0, 0, 32, 0, 0, 0, 0);
     
+    if (render_text == NULL)
+    {
+        fprintf(stderr, "could not render text: %s", SDL_GetError());
+        exit(-1);
+    }
+    
     shark_render *render = (shark_render *) shark_object_new(shark_render_class);
     render->surface = render_text;
     
@@ -171,8 +177,8 @@ SHARK_NATIVE(load_image)
     
     if (image == NULL)
     {
-        shark_set_err(1);
-        return SHARK_NULL;
+        fprintf(stderr, "could not load image: %s", SDL_GetError());
+        exit(-1);
     }
     
     shark_render *result = shark_object_new(shark_render_class);

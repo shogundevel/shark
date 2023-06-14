@@ -50,7 +50,7 @@ functions
 =========
 
 function = "function" name args [ '->' type ] EOL [ indented_block ]
-args = '(' [ name ':' type { ',' name ':' type } ] ')'
+args = '(' [ name ':' type { ',' name ':' type } [ ',' "..." ] ] ')'
 
 types
 =====
@@ -146,6 +146,7 @@ primary_exp = literal
             | "new" [ '[' exp ']' ] type [ '(' [ exp { ',' exp } ] ')' ]
             | "instanceof" '(' exp ',' custom_type ')'
             | "cast" '(' exp ',' type ')'
+            | "next" '(' type ')'
             | '(' exp ')'
 
 literal = "null"
