@@ -80,7 +80,7 @@ function main(args: [] str)
     if sizeof(args) == 1 then
         inline "printf(\"usage: %s <name1> <name2> ... <nameN>\\n\", args[0]->data);"
     else
-        for i: int = 0, i < sizeof(args), i++ do
+        for i to sizeof(args) do
             inline "printf(\"Hello, %s!\\n\", ((shark_str) args->data[i])->data);"
 
 ```
