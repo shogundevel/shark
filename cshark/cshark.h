@@ -97,7 +97,13 @@ typedef enum {
 	OP_SET_FIELD_AU = 67,
 	OP_SET_STATIC_AU = 68,
     OP_ARRAY_CLOSE = 69,
-    OP_TABLE_CLOSE = 70
+    OP_TABLE_CLOSE = 70,
+    OP_BAND = 71,
+    OP_BOR = 72,
+    OP_BXOR = 73,
+    OP_BSHL = 74,
+    OP_BSHR = 75,
+    OP_BNOT = 76
 } shark_opcode;
 
 typedef enum {
@@ -444,10 +450,13 @@ SHARK_API shark_module *shark_read_archive(shark_vm *vm, shark_string *name, voi
 #define SHARK_VM_STACK_GROW_SIZE(x) (x << 1)
 
 SHARK_API shark_vm *shark_vm_new();
+SHARK_API shark_module *shark_vm_bind_module(shark_vm *vm, char *name);
+SHARK_API shark_class *shark_vm_bind_class(shark_vm *vm, shark_module *module, char *name, size_t object_size, void (*destroy)(shark_object *), bool is_object_class);
+SHARK_API shark_function *shark_vm_bind_function(shark_vm *vm, shark_module *module, shark_class *type, char *name, size_t arity, shark_native_function code);
 SHARK_API void shark_vm_add_import_path(shark_vm *self, shark_string *import_path);
 SHARK_API void shark_vm_exec_module(shark_vm *self, shark_module *module);
 SHARK_API shark_module *shark_vm_import_module(shark_vm *self, shark_string *name);
-SHARK_API shark_value shark_vm_execute(shark_vm *self, shark_vm_frame frame);
+SHARK_API shark_value shark_vm_execute(shark_vm *self, shark_vm_frame *prev, shark_module *module, shark_function *code);
 SHARK_API void shark_vm_exec_module(shark_vm *self, shark_module *module);
 SHARK_API shark_value shark_vm_exec_main(shark_vm *self, shark_module *module, shark_array *args);
 
@@ -458,6 +467,6 @@ SHARK_API void shark_clear_err();
 
 SHARK_API shark_string *shark_string_format(shark_string *format, shark_array *args);
 
-SHARK_API void shark_init_library(shark_vm *vm, shark_string *library_path);
+SHARK_API void shark_init_library(shark_vm *vm);
 
 #endif  // __CSHARK_INCLUDE__

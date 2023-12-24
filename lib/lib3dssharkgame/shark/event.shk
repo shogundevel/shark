@@ -1,0 +1,102 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+var E_NONE = 0
+var E_PRESS = 1
+var E_MOVE = 2
+var E_RELEASE = 3
+var E_PRESS_UP = 4
+var E_PRESS_DOWN = 5
+var E_PRESS_LEFT = 6
+var E_PRESS_RIGHT = 7
+var E_PRESS_X = 8
+var E_PRESS_Y = 9
+var E_REL_UP = 10
+var E_REL_DOWN = 11
+var E_REL_LEFT = 12
+var E_REL_RIGHT = 13
+var E_REL_X = 14
+var E_REL_Y = 15
+
+var Controls
+var ControlsRead = Controls.read
+var ControlsCheck = Controls.check
+
+var KEY_A
+var KEY_B
+var KEY_DUP
+var KEY_DDOWN
+var KEY_DLEFT
+var KEY_DRIGHT
+var KEY_HOME
+var KEY_POWER
+
+var last_event = 0
+var exit = false
+
+function dispatch(consumer)
+    var event = ControlsRead()
+    
+    if ControlsCheck(event, KEY_A) then
+        if not ControlsCheck(last_event, KEY_A) then
+            consumer.event(E_PRESS_X, 0, 0)
+    else if ControlsCheck(last_event, KEY_A) then
+        consumer.event(E_REL_X, 0, 0)
+    
+    if ControlsCheck(event, KEY_B) then
+        if not ControlsCheck(last_event, KEY_B) then
+            consumer.event(E_PRESS_Y, 0, 0)
+    else if ControlsCheck(last_event, KEY_B) then
+        consumer.event(E_REL_Y, 0, 0)
+    
+    if ControlsCheck(event, KEY_DUP) then
+        if not ControlsCheck(last_event, KEY_DUP) then
+            consumer.event(E_PRESS_UP, 0, 0)
+    else if ControlsCheck(last_event, KEY_DUP) then
+        consumer.event(E_REL_UP, 0, 0)
+    
+    if ControlsCheck(event, KEY_DDOWN) then
+        if not ControlsCheck(last_event, KEY_DDOWN) then
+            consumer.event(E_PRESS_DOWN, 0, 0)
+    else if ControlsCheck(last_event, KEY_DDOWN) then
+        consumer.event(E_REL_DOWN, 0, 0)
+    
+    if ControlsCheck(event, KEY_DLEFT) then
+        if not ControlsCheck(last_event, KEY_DLEFT) then
+            consumer.event(E_PRESS_LEFT, 0, 0)
+    else if ControlsCheck(last_event, KEY_DLEFT) then
+        consumer.event(E_REL_LEFT, 0, 0)
+    
+    if ControlsCheck(event, KEY_DRIGHT) then
+        if not ControlsCheck(last_event, KEY_DRIGHT) then
+            consumer.event(E_PRESS_RIGHT, 0, 0)
+    else if ControlsCheck(last_event, KEY_DRIGHT) then
+        consumer.event(E_REL_RIGHT, 0, 0)
+    
+    if ControlsCheck(event, KEY_HOME) or ControlsCheck(event, KEY_POWER) then
+        exit = true
+    
+    last_event = event

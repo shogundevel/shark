@@ -47,6 +47,7 @@ function main(args)
         puts("\t\tpy: generates a python file with import statements for the shark runtime (sharkrt.py) and each library listed in <args>. <args> should contain only library names, not direct filenames. The output executable depends on sharkrt.py and the listed libraries to run.\n")
         puts("\t\tpyo: generates a self-contained python executable by embedding the shark runtime (sharkrt.py) and each file listed in <args>. <args> should contain file paths to the required libraries. The output executable is dependency free.\n")
         puts("\t\tjs: generates a self-contained javascript executable by embedding the shark runtime (sharkrt.js) and each file listed in <args>. <args> should contain file paths to the required libraries. The output executable is dependency free.\n")
+        puts("\t\tfl: generates a flash actionscript 2 executable by embedding the shark runtime (sharkrt.fl) and each file listed in <args>. <args> should contain file paths to the required libraries. The output requires more steps to become executable, listed in the 'guide' file that should come with this program.\n")
         puts("\t\tas: generates an actionscript executable by embedding the shark runtime (sharkrt.as) and each file listed in <args>. <args> should contain file paths to the required libraries. The output requires more steps to become executable, listed in the 'guide' file that should come with this program.\n")
         puts("\t\tds: generates a droidscript executable by embedding the shark runtime (sharkrt.ds) and each file listed in <args>. <args> should contain file paths to the required libraries. The output requires more steps to become executable, listed in the 'guide' file that should come with this program.\n")
         puts("\t\tlua: generates a lua file with require calls for the shark runtime (sharkrt.lua) and each library listed in <args>. <args> should contain only library names, not direct filenames. The output executable depends on sharkrt.lua and the listed libraries to run.\n")
@@ -102,6 +103,14 @@ function main(args)
         for lib in link do
             fread(fopen(lib, "r"), out)
         fread(source, out)
+    else if target == "fl" then
+        fread(fopen(join(base, "rt/sharkrt.fl"), "r"), out)
+        for lib in link do
+            fread(fopen(lib, "r"), out)
+        fread(source, out)
+        out.puts("var main = __shark_rt_import('main');\n")
+        out.puts("current_child = new main.main_activity ();\n")
+        out.puts("current_child.launch()")
     else if target == "as" then
         fread(fopen(join(base, "rt/sharkrt.as"), "r"), out)
         for lib in link do
@@ -138,6 +147,6 @@ function main(args)
             out.printf("var main = __shark_rt_import('%');\n", [main])
         else if target == "lua" or target == "luao" then
             out.printf("main = __shark_rt_import('%')\n", [main])
-            out.puts("arg[#arg + 1] = ''\n")
+            out.puts("if arg ~= nil then arg[#arg + 1] = '' end\n")
             out.puts("if main.main then main.main(arg) end")
     out.close()

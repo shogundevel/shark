@@ -50,14 +50,14 @@ function OnStart()
 {
     app.SetOrientation("Landscape");
     var layout = app.CreateLayout("Linear");
-    display = app.CreateImage(null, 1, 1, "alias", 320, 192)
-    display_scale_x = app.GetDisplayWidth() / 320;
-    display_scale_y = app.GetDisplayHeight() / 192;
+    display = app.CreateImage(null, 1, 1, "alias", 480, 272)
+    display_scale_x = app.GetDisplayWidth() / 480;
+    display_scale_y = app.GetDisplayHeight() / 272;
     display.SetTextSize(12 * display_scale_x);
     display.SetPaintColor("#FF000000");
     display.SetOnTouch(function (ev) {
-        var x = ev.x[0] * 320;
-        var y = ev.y[0] * 192;
+        var x = ev.x[0] * 480;
+        var y = ev.y[0] * 272;
         if (ev.action == "Down") current_child.event(E_PRESS, x, y);
         else if (ev.action == "Move") current_child.event(E_MOVE, x, y);
         else if (ev.action == "Up") current_child.event(E_RELEASE, x, y);

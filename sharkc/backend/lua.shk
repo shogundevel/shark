@@ -565,6 +565,9 @@ class lua_generator
     function int_literal(value)
         self.exp = value
     
+    function hex_literal(value)
+        self.exp = value
+    
     function float_literal(value)
         self.exp = value
     

@@ -64,7 +64,7 @@ public class SharkGame {
 		public Activity(Class type)
 		{
 			this.type = type;
-			screen_image = new BufferedImage(320, 192, BufferedImage.TYPE_INT_ARGB);
+			screen_image = new BufferedImage(SIZE_X, SIZE_Y, BufferedImage.TYPE_INT_ARGB);
 			screen = screen_image.createGraphics();
 		}
 		
@@ -72,7 +72,7 @@ public class SharkGame {
 			screen.drawImage(texture.texture, x, y, null);
 		}
 		
-		public void draw_ex(Texture texture, int x, int y, int origin_x, int origin_y, float rotation, float scale_x, float scale_y)
+        public void draw_ex(Texture texture, int x, int y, int origin_x, int origin_y, float rotation, float scale_x, float scale_y)
 		{
 			AffineTransform transform = screen.getTransform();
 			screen.translate(x, y);
@@ -81,7 +81,7 @@ public class SharkGame {
 			screen.drawImage(texture.texture, -texture.size_x / 2, -texture.size_y / 2, null);
 			screen.setTransform(transform);
 		}
-		
+        
 		public void draw_text(String text, SharkFont font, int x, int y)
 		{
 			screen.setFont(font.font);
@@ -394,7 +394,7 @@ public class SharkGame {
 			function.arity = 8;
 			
 			current_class.methods.put(function.name, function);
-			
+            
             function = new Function () {
 				@Override
 				public Object call(VirtualMachine caller) throws RuntimeError {

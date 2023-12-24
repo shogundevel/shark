@@ -99,5 +99,11 @@ public static final int
 	SET_FIELD_AU = 67,
 	SET_STATIC_AU = 68,
 	ARRAY_CLOSE = 69,
-	TABLE_CLOSE = 70;
+	TABLE_CLOSE = 70,
+    BAND = 71,
+    BOR = 72,
+    BXOR = 73,
+    BSHL = 74,
+    BSHR = 75,
+    BNOT = 76;
 }

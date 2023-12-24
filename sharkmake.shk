@@ -32,18 +32,11 @@ import sharkenv.core
 import sharkc
 import sharklink
 import sharkemu
-import sharkmake
 import sharkzip
+import sharkunzip
 
 function play(args)
     sharkemu::play()
-
-core::command_table["compile"] = sharkc::main
-core::command_table["link"] = sharklink::main
-core::command_table["run"] = sharkemu::main
-core::command_table["play"] = play
-core::command_table["make"] = sharkmake::main
-core::command_table["zip"] = sharkzip::main
 
 function main(args)
     core::exec_name = args[0]
@@ -60,3 +53,11 @@ function main(args)
     else
         for index in range(1, sizeof(args)) do
             core::make(data, args[index])
+
+core::command_table["compile"] = sharkc::main
+core::command_table["link"] = sharklink::main
+core::command_table["run"] = sharkemu::main
+core::command_table["play"] = play
+core::command_table["make"] = main
+core::command_table["unzip"] = sharkunzip::main
+core::command_table["zip"] = sharkzip::main

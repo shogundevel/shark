@@ -370,6 +370,10 @@ class javascript_generator
             op = "&&"
         else if op == "or" then
             op = "||"
+        else if op == "<~" then
+            op = "<<"
+        else if op == "~>" then
+            op = ">>"
         else if op == "in" then
             self.exp = format("%[%] != undefined", [self.exp, self.exp_left])
             self.exit_binop()
@@ -382,9 +386,12 @@ class javascript_generator
         self.exit_binop()
     
     function unary_op(op)
-        if op == "not" then
-            op = "!"
-        self.exp = format("% %", [op, self.exp])
+        if op == "~" then
+            self.exp = format("((~%) & 0xFFFFFFFF)", [self.exp])
+        else
+            if op == "not" then
+                op = "!"
+            self.exp = format("% %", [op, self.exp])
     
     function enter_call()
         self.call_stack << [self.exp_left, self.call_args]
@@ -522,6 +529,9 @@ class javascript_generator
         self.exp = "false"
     
     function int_literal(value)
+        self.exp = value
+    
+    function hex_literal(value)
         self.exp = value
     
     function float_literal(value)

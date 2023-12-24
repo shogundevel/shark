@@ -1,0 +1,166 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import shark.event
+import shark.texture
+import shark.text
+
+var math
+
+var TOP_SCREEN
+var BOTTOM_SCREEN
+
+var System
+
+var Graphics
+var GraphicsInit = Graphics.init
+var GraphicsDraw = Graphics.drawImage
+var GraphicsDrawEx = Graphics.drawImageExtended
+var GraphicsDrawRect = Graphics.fillRect
+var GraphicsBlend = Graphics.initBlend
+var GraphicsUnblend = Graphics.termBlend
+
+var Screen
+var ScreenRefresh = Screen.refresh
+var ScreenFlip = Screen.flip
+var ScreenWait = Screen.waitVblankStart
+var ScreenDraw = Screen.drawImage
+var ScreenRect = Screen.fillRect
+
+var Font
+var FontPrint = Font.print
+
+var Timer
+var TimerNew = Timer["new"]
+var TimerGet = Timer.getTime
+var TimerPlaying = Timer.isPlaying
+var TimerResume = Timer.resume
+
+var text_buffer = [ ]
+
+class activity
+    function init()
+        pass
+    
+    function draw(text, x, y)
+        text.reload()
+        GraphicsDraw(x, y + 24, text.image_id)
+        # ScreenDraw(x, y + 24, text.image_id, BOTTOM_SCREEN)
+    
+    function draw_ex(text, x, y, origin_x, origin_y, rotation, scale_x, scale_y)
+        text.reload()
+        GraphicsDrawEx(x, y + 24, 0, 0, text.get_size_x(), text.get_size_y(), -rotation * math::pi / 180, scale_x, scale_y, text.image_id)
+        # ScreenDraw(x, y + 24, text.image_id, BOTTOM_SCREEN)
+    
+    function draw_text(text, font, x, y)
+        font.reload()
+        text_buffer << [text, font, x, y]
+    
+    function launch()
+        pass
+    
+    function event(type, x, y)
+        pass
+    
+    function text_event(text)
+        pass
+    
+    function cancel_event()
+        pass
+    
+    function update()
+        pass
+    
+    function render()
+        pass
+
+function launch_activity (activity_class)
+    var activity = new activity_class ()
+    var timer = TimerNew()
+    
+    var max_time = 42
+    var last_time = 0
+    var collect_time = 0
+    
+    activity.launch()
+    
+    ScreenWait()
+    
+    while true do
+        if not TimerPlaying(timer) then
+            TimerResume(timer)
+        
+        event::dispatch(activity)
+        activity.update()
+        
+        while true do
+            ScreenRefresh()
+            GraphicsBlend(BOTTOM_SCREEN)
+            
+            activity.render()
+            
+            GraphicsUnblend()
+            
+            for text_command in text_buffer do
+                FontPrint(
+                    text_command[1].font,
+                    text_command[2],
+                    text_command[3] + 24,
+                    text_command[0],
+                    text_command[1].color,
+                    BOTTOM_SCREEN
+                )
+            
+            text_buffer = [ ]
+            
+            # GraphicsDrawRect(0, 0, 320, 24, 255)
+            # GraphicsDrawRect(0, 216, 320, 240, 255)
+            
+            ScreenFlip()
+            ScreenWait()
+            
+            var time = TimerGet(timer)
+            
+            if time < last_time + 42 then
+                continue
+            else
+                last_time += 42
+                break
+        
+        collect_time = collect_time + 1
+        
+        if collect_time == 12 then
+            texture::collect()
+            text::collect()
+            collect_time = 0
+        
+        if event::exit then
+            break
+    
+    texture::exit()
+    text::exit()
+    
+    System::exit()

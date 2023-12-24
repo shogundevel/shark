@@ -1,0 +1,72 @@
+################################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import system.io: puts, printf, open
+import system.path: join, listdir, mkdir, get_tail
+import system.util: pop, extend
+import system.string: encode, decode, concat, bytes, slice, len
+
+function unzip(buffer, path)
+    var head_size = 0
+    while true do
+        var head_data = buffer.read(30)
+        if (head_data.get(0) != 80 or head_data.get(1) != 75
+        or head_data.get(2) != 3 or head_data.get(3) != 4) then
+            break
+        var name_size = head_data.get(26) | (head_data.get(27) <~ 8)
+        var name_data = buffer.read(name_size)
+        if head_size == 0 then
+            head_size = name_data.tell()
+            continue
+        var data_size = head_data.get(22) | (head_data.get(23) <~ 8) | (head_data.get(24) <~ 16) | (head_data.get(25) <~ 24)
+        var name_sym = decode(name_data)
+        var filename = concat(path, slice(name_sym, head_size - 1, len(name_sym)))
+        if data_size == 0 then
+            mkdir(filename)
+        else
+            var file = open(filename, "wb")
+            if file == null then
+                printf("can't open file '%' for writting. Aborting zip extraction.\n", [file])
+                return
+            while data_size > 256 do
+                file.puts(buffer.read(256))
+                data_size -= 256
+            file.puts(buffer.read(data_size))
+            file.close()
+
+function main(args)
+    if sizeof(args) != 3 then
+        printf("%\n", [crc32(encode("123456789"))])
+        puts("usage: unzip <source> <target>\n")
+        puts("\tunzip a <source> shark zipped archive into the <target> directory.\n")
+        puts("\tthe <target> directory must already exist and preferably be empty.\n")
+        return
+    var source = open(args[1], "rb")
+    var target = args[2]
+    if source == null then
+        printf("can't open input file '%' for reading.\n", [args[1]])
+        return
+    unzip(source, target)

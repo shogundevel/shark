@@ -353,11 +353,18 @@ class python_generator
     function binary_op(op)
         if op == "not" then
             op = "not in"
+        else if op == "<~" then
+            op = "<<"
+        else if op == "~>" then
+            op = ">>"
         self.exp = format("% % %", [self.exp_left, op, self.exp])
         self.exit_binop()
     
     function unary_op(op)
-        self.exp = format("% %", [op, self.exp])
+        if op == "~" then
+            self.exp = format("((~(% | 0x100000000)) & 0xFFFFFFFF)", [self.exp])
+        else
+            self.exp = format("% %", [op, self.exp])
     
     function enter_call()
         self.call_stack << [self.exp_left, self.call_args]
@@ -491,6 +498,9 @@ class python_generator
         self.exp = "False"
     
     function int_literal(value)
+        self.exp = value
+    
+    function hex_literal(value)
         self.exp = value
     
     function float_literal(value)

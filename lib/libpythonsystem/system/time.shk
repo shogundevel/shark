@@ -26,4 +26,4 @@
 
 import time
 
-clock = time::clock
+clock = time::time

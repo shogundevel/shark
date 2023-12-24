@@ -1,0 +1,4 @@
+
+var id = "paddle"
+var name = "Paddle"
+var author = "Shark SDK"

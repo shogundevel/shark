@@ -36,7 +36,7 @@ int main(int argc, char **argv)
         shark_string *base = shark_path_get_base(exec);
         
         shark_vm_add_import_path(vm, base);
-        shark_init_library(vm, base);
+        shark_init_library(vm);
         
         shark_string *filename = shark_string_new_from_cstr(argv[1]);
         FILE *source = fopen(filename->data, "rb");

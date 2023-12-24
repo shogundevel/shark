@@ -26,6 +26,11 @@
 
 import flash.display.BitmapData;
 import flash.geom.Rectangle;
+import flash.events.MouseEvent;
+import flash.events.KeyboardEvent;
+import flash.ui.Keyboard;
+import flash.text.TextField;
+import flash.text.TextFormat;
 
 var __shark_rt_imports = { };
 var __shark_rt_modules = { };
@@ -41,15 +46,30 @@ function __shark_rt_import(module)
     }
 }
 
+function __shark_load_bitmap(name, object)
+{
+    var loader = new Loader ();
+    
+    loader.contentLoaderInfo.addEventListener(Event.COMPLETE, function (ev) {
+        object.data = Bitmap(LoaderInfo(ev.target).content).bitmapData;
+        trace("Loaded bitmap: " + name);
+        trace(object.data);
+    });
+    
+    loader.load(new URLRequest ("./asset/" + name));
+    
+    return object;
+}
+
 var current_object = this;
 var current_child = null;
 
 var objects = [ ];
 var prev_objects = [ ];
 
-var text_label = this.createTextField("text_label", this.getNextHighestDepth(), 0, 0, 320, 24);
-var text_data = new BitmapData (320, 24, true, 0);
-var text_rect = new Rectangle (0, 0, 320, 24);
+var text_label: TextField = new TextField ();
+var text_data = new BitmapData (480, 24, true, 0);
+var text_rect = new Rectangle (0, 0, 480, 24);
 
 var E_NONE = 0;
 var E_PRESS = 1;
@@ -68,79 +88,67 @@ var E_REL_RIGHT = 13;
 var E_REL_X = 14;
 var E_REL_Y = 15;
 
-var key_listener = new Object ();
-
-key_listener.onKeyDown = function () {
-    var key = Key.getCode();
-    if (key == Key.UP) {
+this.addEventListener(KeyboardEvent.KEY_DOWN, function (ev: KeyboardEvent) {
+    var key = ev.keyCode;
+    if (key == Keyboard.UP) {
         current_child.event(E_PRESS_UP, 0, 0);
-    } else if (key == Key.DOWN) {
+    } else if (key == Keyboard.DOWN) {
         current_child.event(E_PRESS_DOWN, 0, 0);
-    } else if (key == Key.LEFT) {
+    } else if (key == Keyboard.LEFT) {
         current_child.event(E_PRESS_LEFT, 0, 0);
-    } else if (key == Key.RIGHT) {
+    } else if (key == Keyboard.RIGHT) {
         current_child.event(E_PRESS_RIGHT, 0, 0);
-    } else {
-        var code = Key.getAscii();
-        if (code == "z" || code == "Z") {
-            current_child.event(E_PRESS_X, 0, 0);
-        } else if (code == "x" || code == "x") {
-            current_child.event(E_PRESS_Y, 0, 0);
-        }
-    }
-};
+    } else if (key == Keyboard.Z) {
+		current_child.event(E_PRESS_X, 0, 0);
+	} else if (key == Keyboard.X) {
+		current_child.event(E_PRESS_Y, 0, 0);
+	}
+});
 
-key_listener.onKeyUp = function () {
-    var key = Key.getCode();
-    if (key == Key.UP) {
+this.addEventListener(KeyboardEvent.KEY_UP, function (ev: KeyboardEvent) {
+    var key = ev.keyCode;
+    if (key == Keyboard.UP) {
         current_child.event(E_REL_UP, 0, 0);
-    } else if (key == Key.DOWN) {
+    } else if (key == Keyboard.DOWN) {
         current_child.event(E_REL_DOWN, 0, 0);
-    } else if (key == Key.LEFT) {
+    } else if (key == Keyboard.LEFT) {
         current_child.event(E_REL_LEFT, 0, 0);
-    } else if (key == Key.RIGHT) {
+    } else if (key == Keyboard.RIGHT) {
         current_child.event(E_REL_RIGHT, 0, 0);
-    } else {
-        var code = Key.getAscii();
-        if (code == "z" || code == "Z") {
-            current_child.event(E_REL_X, 0, 0);
-        } else if (code == "x" || code == "X") {
-            current_child.event(E_REL_Y, 0, 0);
-        }
-    }
-};
+    } else if (key == Keyboard.Z) {
+		current_child.event(E_REL_X, 0, 0);
+	} else if (key == Keyboard.X) {
+		current_child.event(E_REL_Y, 0, 0);
+	}
+});
 
-Key.addListener(key_listener);
-
-var mouse_listener = new Object ();
 var pressed = false;
 
-mouse_listener.onMouseDown = function () {
+this.addEventListener(MouseEvent.MOUSE_DOWN, function (ev) {
     pressed = true;
-    current_child.event(E_PRESS, _xmouse, _ymouse);
-}
+	current_child.event(E_PRESS, ev.stageX, ev.stageY);
+});
 
-mouse_listener.onMouseUp = function () {
+this.addEventListener(MouseEvent.MOUSE_UP, function (ev) {
     pressed = false;
-    current_child.event(E_RELEASE, _xmouse, _ymouse);
-}
+    current_child.event(E_RELEASE, ev.stageX, ev.stageY);
+});
 
-mouse_listener.onMouseMove = function () {
-    if (pressed) current_child.event(E_MOVE, _xmouse, _ymouse);
-}
+this.addEventListener(MouseEvent.MOUSE_MOVE, function (ev) {
+    if (pressed)
+		current_child.event(E_MOVE, ev.stageX, ev.stageY);
+});
 
-Mouse.addListener(mouse_listener);
-
-this.onEnterFrame = function () {
+this.addEventListener(Event.ENTER_FRAME, function () {
     for (var i = 0; i < objects.length; i++) {
-        objects[i]._x = 0;
-        objects[i]._y = 0;
-        objects[i].clear();
+        objects[i].x = 0;
+        objects[i].y = 0;
+        objects[i].graphics.clear();
     }
     objects.splice(0, objects.length);
     current_child.update();
     current_child.render();
-};
+});
 
 function error(message) {
     throw message;

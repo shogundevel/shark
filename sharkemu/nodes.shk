@@ -317,6 +317,26 @@ class binary_op_or (binary_op)
     function run(state)
         return self.x.run(state) or self.y.run(state)
 
+class binary_op_bit_and (binary_op)
+    function run(state)
+        return self.x.run(state) & self.y.run(state)
+
+class binary_op_bit_or (binary_op)
+    function run(state)
+        return self.x.run(state) | self.y.run(state)
+
+class binary_op_bit_xor (binary_op)
+    function run(state)
+        return self.x.run(state) ^ self.y.run(state)
+
+class binary_op_bit_shl (binary_op)
+    function run(state)
+        return self.x.run(state) <~ self.y.run(state)
+
+class binary_op_bit_shr (binary_op)
+    function run(state)
+        return self.x.run(state) ~> self.y.run(state)
+
 class unary_op
     function init(x)
         self.x = x
@@ -328,6 +348,10 @@ class unary_op_not (unary_op)
 class unary_op_minus (unary_op)
     function run(state)
         return -self.x.run(state)
+
+class unary_op_bit_not (unary_op)
+    function run(state)
+        return ~self.x.run(state)
 
 function call_function(state, callee, self_object, args)
     if instanceof(callee, runtime::native_function_object) then

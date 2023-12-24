@@ -109,6 +109,9 @@ public class VirtualMachine
 		
 		double x;
 		double y;
+        
+        int z;
+        int w;
 		
 		Object xo;
 		Object yo;
@@ -136,31 +139,31 @@ public class VirtualMachine
 				push(false);
 				break;
 			case Opcode.LOAD_GLOBAL:
-				push(globals.get(const_table[fetch_int()]));
+				push(globals.get(const_table[fetch_short()]));
 				break;
 			case Opcode.LOAD:
-				push(stack[base + fetch_short()]);
+				push(stack[base + fetch()]);
 				break;
 			case Opcode.GET_FIELD:
-				push(((shark.core.Table) pop()).data.get(const_table[fetch_int()]));
+				push(((shark.core.Table) pop()).data.get(const_table[fetch_short()]));
 				break;
 			case Opcode.ENTER_CLASS:
-				current_class = new shark.core.Class((String) const_table[fetch_int()], (shark.core.Class) pop());
+				current_class = new shark.core.Class((String) const_table[fetch_short()], (shark.core.Class) pop());
 				break;
 			case Opcode.EXIT_CLASS:
 				globals.put(current_class.name, current_class);
 				current_class = null;
 				break;
 			case Opcode.DEFINE:
-				globals.put((String) const_table[fetch_int()], pop());
+				globals.put((String) const_table[fetch_short()], pop());
 				break;
 			case Opcode.DEFINE_FIELD:
-				fetch_int();
+				fetch_short();
 				break;
 			case Opcode.FUNCTION:
 				BytecodeFunction function = new BytecodeFunction();
-				function.arity = fetch_short();
-				function.name = (String) const_table[fetch_int()];
+				function.arity = fetch();
+				function.name = (String) const_table[fetch_short()];
 				function.set_owner_module(module);
 				if (current_class != null) {
 					function.is_method = true;
@@ -180,7 +183,7 @@ public class VirtualMachine
 			case Opcode.NOT_IMPLEMENTED:
 				throw new RuntimeError ("function '" + current_function.name + "' is not implemented.");
 			case Opcode.EXIT:
-				int block_size = fetch_short();
+				int block_size = fetch();
 				for (int i = 0; i < block_size; i++) pop();
 				break;
 			case Opcode.DUP:
@@ -292,7 +295,7 @@ public class VirtualMachine
 			case Opcode.METHOD_CALL:
 				argc = fetch();
 				object = (shark.core.Object) stack[TOS - argc - 1];
-				String method_name = (String) const_table[fetch_int()];
+				String method_name = (String) const_table[fetch_short()];
 				if (object == null) {
 					System.out.println(current_function.name + " " + PC);
 					for (int i = base; i < TOS; i++) {
@@ -428,7 +431,7 @@ public class VirtualMachine
 				current_table.data.put(xo, yo);
 				break;
 			case Opcode.CONST:
-				push(const_table[fetch_int()]);
+				push(const_table[fetch_short()]);
 				break;
 			case Opcode.RETURN:
 				xo = pop();
@@ -447,20 +450,20 @@ public class VirtualMachine
 				((shark.core.Array) xo).add(yo);
 				break;
 			case Opcode.STORE_GLOBAL:
-				globals.put((String) const_table[fetch_int()], pop());
+				globals.put((String) const_table[fetch_short()], pop());
 				break;
 			case Opcode.STORE:
-				stack[base + fetch_short()] = pop();
+				stack[base + fetch()] = pop();
 				break;
 			case Opcode.SET_STATIC:
 				yo = pop();
 				xo = pop();
-				((shark.core.Module) xo).namespace.put((String) const_table[fetch_int()], yo);
+				((shark.core.Module) xo).namespace.put((String) const_table[fetch_short()], yo);
 				break;
 			case Opcode.SET_FIELD:
 				yo = pop();
 				xo = pop();
-				((shark.core.Table) xo).data.put((String) const_table[fetch_int()], yo);
+				((shark.core.Table) xo).data.put((String) const_table[fetch_short()], yo);
 				break;
 			case Opcode.SET_INDEX:
 				zo = pop();
@@ -475,7 +478,7 @@ public class VirtualMachine
 				}
 				break;
 			case Opcode.GET_FIELD_TOP:
-				push(((shark.core.Table) stack[TOS-1]).data.get(const_table[fetch_int()]));
+				push(((shark.core.Table) stack[TOS-1]).data.get(const_table[fetch_short()]));
 				break;
 			case Opcode.GET_INDEX_TOP:
 				yo = stack[TOS-1];
@@ -489,10 +492,10 @@ public class VirtualMachine
 				}
 				break;
 			case Opcode.GET_STATIC:
-				push(((shark.core.Module) pop()).namespace.get((String) const_table[fetch_int()]));
+				push(((shark.core.Module) pop()).namespace.get((String) const_table[fetch_short()]));
 				break;
 			case Opcode.GET_STATIC_TOP:
-				push(((shark.core.Module) stack[TOS-1]).namespace.get((String) const_table[fetch_int()]));
+				push(((shark.core.Module) stack[TOS-1]).namespace.get((String) const_table[fetch_short()]));
 				break;
 			case Opcode.IF:
 				if ((boolean) pop() == false)
@@ -510,7 +513,7 @@ public class VirtualMachine
 				push((double) 0);
 				break;
 			case Opcode.INC:
-				int local = fetch_short();
+				int local = fetch();
 				double value = (double) stack[base + local];
 				stack[base + local] = value + 1;
 				break;
@@ -548,14 +551,14 @@ public class VirtualMachine
 				yo = pop();
 				xo = pop();
 				int field_au_op = fetch();
-				String field_au = (String) const_table[fetch_int()];
+				String field_au = (String) const_table[fetch_short()];
 				((shark.core.Table) xo).data.put(field_au, binop((double) ((shark.core.Table) xo).data.get(field_au), (double) yo, field_au_op));
 				break;
 			case Opcode.SET_STATIC_AU:
 				yo = pop();
 				xo = pop();
 				int static_au_op = fetch();
-				String static_au = (String) const_table[fetch_int()];
+				String static_au = (String) const_table[fetch_short()];
 				((shark.core.Module) xo).namespace.put(static_au, binop((double) ((shark.core.Module) xo).namespace.get(static_au), (double) yo, static_au_op));
 				break;
 			case Opcode.ARRAY_CLOSE:
@@ -568,7 +571,35 @@ public class VirtualMachine
 				push(current_table);
 				current_table = (shark.core.Table) xo;
 				break;
-			default:
+            case Opcode.BAND:
+				z = (int) (double) pop();
+				w = (int) (double) pop();
+				push(w & z);
+				break;
+			case Opcode.BOR:
+				z = (int) (double) pop();
+				w = (int) (double) pop();
+				push(w | z);
+				break;
+            case Opcode.BXOR:
+				z = (int) (double) pop();
+				w = (int) (double) pop();
+				push(w | z);
+				break;
+            case Opcode.BSHL:
+				z = (int) (double) pop();
+				w = (int) (double) pop();
+				push(w << z);
+				break;
+            case Opcode.BSHR:
+				z = (int) (double) pop();
+				w = (int) (double) pop();
+				push(w >> z);
+				break;
+            case Opcode.BNOT:
+				push(~((int) (double) pop()));
+				break;
+            default:
 				throw new RuntimeError("unsupported operation: " + code[--PC]);
 			}
 		}

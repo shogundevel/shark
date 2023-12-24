@@ -184,7 +184,7 @@ class lexer
                 self.buffer.put(self.next())
                 while string::ishex(self.current_char) do
                     self.buffer.put(self.next())
-                return self.emit("int", self.buffer.read_all())
+                return self.emit("hex", self.buffer.read_all())
             else if string::isdigit(self.current_char) then
                 self.error("unexpected digit character after zero.")
         while string::isdigit(self.current_char) do
@@ -306,6 +306,8 @@ class lexer
                         return self.emit("assign", "<<=")
                     else
                         return self.emit("operator", "<<")
+                else if self.match('~') then
+                    return self.emit("operator", "<~")
                 else
                     return self.emit("operator", "<")
             else if c == '>' then
@@ -315,6 +317,17 @@ class lexer
                     return self.emit("operator", ">>")
                 else
                     return self.emit("operator", ">")
+            else if c == '~' then
+                if self.match('>') then
+                    return self.emit("operator", "~>")
+                else
+                    return self.emit("operator", "~")
+            else if c == '&' then
+                return self.emit("operator", "&")
+            else if c == '|' then
+                return self.emit("operator", "|")
+            else if c == '^' then
+                return self.emit("operator", "^")
             else if c == '=' then
                 if self.match('=') then
                     return self.emit("operator", "==")

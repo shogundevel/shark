@@ -112,6 +112,7 @@ SHARK_NATIVE(error)
     shark_string *message = SHARK_AS_STR(args[0]);
     if (error->protect) {
         error->message = message;
+        shark_object_inc_ref(message);
     } else {
         shark_fatal_error(vm, message->data);
     }
@@ -147,12 +148,7 @@ SHARK_NATIVE(pcall)
     }
     
     if (callee->type == SHARK_BYTECODE_FUNCTION) {
-        result = shark_vm_execute(vm, (shark_vm_frame) {
-            vm->bottom,
-            module, callee,
-            module->names, module->const_table,
-            vm->TOS - argv->length,
-            callee->code.bytecode });
+        result = shark_vm_execute(vm, vm->bottom, module, callee);
     } else {
         shark_vm_frame child = { vm->bottom, module, callee, NULL, NULL, 0, NULL };
         vm->bottom = &child;
@@ -672,7 +668,7 @@ SHARK_API shark_string *shark_string_format(shark_string *format, shark_array *a
                 shark_fatal_error(NULL, "incomplete format.");
             shark_value value = args->data[arg_pointer++];
             if (SHARK_IS_INT(value)) {
-                repr_size = sprintf(temp, "%ld", SHARK_AS_INT(value));
+                repr_size = sprintf(temp, "%lld", SHARK_AS_INT(value));
                 if (repr_size > 256)
                     shark_fatal_error(NULL, "buffer overflow.");
                 repr = temp;
@@ -1121,6 +1117,7 @@ SHARK_NATIVE(text_file_read)
     size_t new_size = fread(data->data, 1, size, SHARK_AS_FILE(args[0])->buffer);
     data->data = shark_realloc(data->data, new_size + 1);
     data->data[new_size] = '\0';
+    data->size = new_size;
     return SHARK_FROM_PTR(data);
 }
 
@@ -1358,6 +1355,7 @@ SHARK_NATIVE(extend)
     shark_array_preallocate(list, list->length + other->length);
     for (size_t i = 0; i < other->length; i++)
         list->data[list->length + i] = shark_value_inc_ref(other->data[i]);
+    list->length = list->length + other->length;
     return SHARK_NULL;
 }
 
@@ -1377,532 +1375,159 @@ SHARK_NATIVE(update)
 
 #undef SHARK_NATIVE
 
-SHARK_API void shark_init_library(shark_vm *vm, shark_string *library_path)
+SHARK_API void shark_init_library(shark_vm *vm)
 {
-    shark_string *system_archive_tail = shark_string_new_from_cstr("system.shar");
-    shark_string *system_archive_name = shark_path_join(library_path, system_archive_tail);
-
-    FILE *system_archive = fopen(system_archive_name->data, "rb");
-    shark_object_dec_ref(system_archive_name);
-
-    if (system_archive == NULL)
-    {
-        fprintf(stderr, "could not find the system archive, aborting execution.");
-        exit(EXIT_FAILURE);
-    }
-
-    shark_read_archive(vm, system_archive_tail, system_archive);
-
-    shark_string *module_name;
     shark_module *module;
     shark_class *type;
     shark_function *function;
-
-    // system.exit
-    module_name = shark_string_new_from_cstr("system.exit");
-    module = shark_vm_import_module(vm, module_name);
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "exit"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_exit;
-
-    // system.time
-    module_name = shark_string_new_from_cstr("system.time");
-    module = shark_vm_import_module(vm, module_name);
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "clock"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_clock;
-
-    // system.error
-    module_name = shark_string_new_from_cstr("system.error");
-    module = shark_vm_import_module(vm, module_name);
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "get_err"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_get_err;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "has_err"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_has_err;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "set_err"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_set_err;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "clear_err"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_clear_err;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "error"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_error;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "pcall"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_pcall;
-
-    // system.path
-    module_name = shark_string_new_from_cstr("system.path");
-    module = shark_vm_import_module(vm, module_name);
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "get_base"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_path_get_base;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "get_tail"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_path_get_tail;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "get_ext"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_path_get_ext;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "remove_ext"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_path_remove_ext;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "join"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_path_join;
-
-#ifndef CSHARK_NO_FS
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "system"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_system;
     
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "listdir"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_listdir;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "mkdir"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_mkdir;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "rmdir"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_rmdir;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "unlink"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_unlink;
+    // system.exit
+    module = shark_vm_bind_module(vm, "system.exit");
+    shark_vm_bind_function(vm, module, NULL, "exit", 1, shark_lib_exit);
+    
+    // system.time
+    module = shark_vm_bind_module(vm, "system.time");
+    shark_vm_bind_function(vm, module, NULL, "clock", 0, shark_lib_clock);
+    
+    // system.error
+    module = shark_vm_bind_module(vm, "system.error");
+    shark_vm_bind_function(vm, module, NULL, "get_err", 0, shark_lib_get_err);
+    shark_vm_bind_function(vm, module, NULL, "has_err", 0, shark_lib_has_err);
+    shark_vm_bind_function(vm, module, NULL, "set_err", 1, shark_lib_set_err);
+    shark_vm_bind_function(vm, module, NULL, "clear_err", 0, shark_lib_clear_err);
+    shark_vm_bind_function(vm, module, NULL, "error", 1, shark_lib_error);
+    shark_vm_bind_function(vm, module, NULL, "pcall", 2, shark_lib_pcall);
+    
+    // system.path
+    module = shark_vm_bind_module(vm, "system.path");
+    shark_vm_bind_function(vm, module, NULL, "get_base", 1, shark_lib_path_get_base);
+    shark_vm_bind_function(vm, module, NULL, "get_tail", 1, shark_lib_path_get_tail);
+    shark_vm_bind_function(vm, module, NULL, "get_ext", 1, shark_lib_path_get_ext);
+    shark_vm_bind_function(vm, module, NULL, "remove_ext", 1, shark_lib_path_remove_ext);
+    shark_vm_bind_function(vm, module, NULL, "join", 2, shark_lib_path_join);
+#ifndef CSHARK_NO_FS
+    shark_vm_bind_function(vm, module, NULL, "system", 1, shark_lib_system);
+    shark_vm_bind_function(vm, module, NULL, "listdir", 1, shark_lib_listdir);
+    shark_vm_bind_function(vm, module, NULL, "mkdir", 1, shark_lib_mkdir);
+    shark_vm_bind_function(vm, module, NULL, "rmdir", 1, shark_lib_rmdir);
+    shark_vm_bind_function(vm, module, NULL, "unlink", 1, shark_lib_unlink);
 #endif // CSHARK_NO_FS
-
+    
     // system.math
-    module_name = shark_string_new_from_cstr("system.math");
-    module = shark_vm_import_module(vm, module_name);
-
-    shark_string *const_name;
-
-    const_name = shark_string_new_from_cstr("pi");
-    shark_table_set_index(module->names, SHARK_FROM_PTR(const_name), SHARK_FROM_NUM(M_PI));
-    shark_object_dec_ref(const_name);
-
-    const_name = shark_string_new_from_cstr("e");
-    shark_table_set_index(module->names, SHARK_FROM_PTR(const_name), SHARK_FROM_NUM(M_E));
-    shark_object_dec_ref(const_name);
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "abs"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_abs;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "acos"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_acos;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "asin"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_asin;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "atan"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_atan;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "atan2"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_atan2;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "cos"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_cos;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "cosh"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_cosh;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "sin"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_sin;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "sinh"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_sinh;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "tan"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_tan;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "tanh"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_tanh;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "exp"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_exp;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "log"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_log;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "log10"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_log10;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "pow"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_pow;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "sqrt"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_sqrt;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "ceil"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_ceil;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "floor"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_floor;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "min"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_min;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "max"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_max;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "random"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_random;
-
+    module = shark_vm_bind_module(vm, "system.math");
+    
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("pi")), SHARK_FROM_NUM(M_PI));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("e")), SHARK_FROM_NUM(M_E));
+    
+    shark_vm_bind_function(vm, module, NULL, "abs", 1, shark_lib_abs);
+    shark_vm_bind_function(vm, module, NULL, "acos", 1, shark_lib_acos);
+    shark_vm_bind_function(vm, module, NULL, "asin", 1, shark_lib_asin);
+    shark_vm_bind_function(vm, module, NULL, "atan", 1, shark_lib_atan);
+    shark_vm_bind_function(vm, module, NULL, "atan2", 2, shark_lib_atan2);
+    shark_vm_bind_function(vm, module, NULL, "cos", 1, shark_lib_cos);
+    shark_vm_bind_function(vm, module, NULL, "cosh", 1, shark_lib_cosh);
+    shark_vm_bind_function(vm, module, NULL, "sin", 1, shark_lib_sin);
+    shark_vm_bind_function(vm, module, NULL, "sinh", 1, shark_lib_sinh);
+    shark_vm_bind_function(vm, module, NULL, "tan", 1, shark_lib_tan);
+    shark_vm_bind_function(vm, module, NULL, "tanh", 1, shark_lib_tanh);
+    shark_vm_bind_function(vm, module, NULL, "exp", 1, shark_lib_exp);
+    shark_vm_bind_function(vm, module, NULL, "log", 2, shark_lib_log);
+    shark_vm_bind_function(vm, module, NULL, "log10", 1, shark_lib_log10);
+    shark_vm_bind_function(vm, module, NULL, "pow", 2, shark_lib_pow);
+    shark_vm_bind_function(vm, module, NULL, "sqrt", 1, shark_lib_sqrt);
+    shark_vm_bind_function(vm, module, NULL, "ceil", 1, shark_lib_ceil);
+    shark_vm_bind_function(vm, module, NULL, "floor", 1, shark_lib_floor);
+    shark_vm_bind_function(vm, module, NULL, "min", 2, shark_lib_min);
+    shark_vm_bind_function(vm, module, NULL, "max", 2, shark_lib_max);
+    shark_vm_bind_function(vm, module, NULL, "random", 1, shark_lib_random);
+    
     // system.string
-    module_name = shark_string_new_from_cstr("system.string");
-    module = shark_vm_import_module(vm, module_name);
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "itos"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_itos;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "ftos"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_ftos;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "ctos"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_ctos;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "stoi"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_stoi;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "stof"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_stof;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "islower"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_islower;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "isupper"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_isupper;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "isalpha"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_isalpha;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "isdigit"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_isdigit;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "isalnum"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_isalnum;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "isident"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_isident;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "ishex"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_ishex;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "isascii"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_isascii;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "issurrogate"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_issurrogate;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "tolower"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_tolower;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "toupper"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_toupper;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "len"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_str_len;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "index"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_str_index;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "slice"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_str_slice;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "find"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_find;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "concat"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_concat;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "join"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_join;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "split"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_split;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "format"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_format;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "normal"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_normal;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "quote"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_quote;
-
-    type = SHARK_AS_CLASS(shark_table_get_str(module->names, "strbuf"));
-    type->object_size = sizeof(shark_strbuf);
-    type->destroy = shark_strbuf_destroy;
-    type->is_object_class = false;
-
-    shark_strbuf_class = type;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "init"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_strbuf_init;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "put"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_strbuf_put;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "puts"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_strbuf_puts;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "printf"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_strbuf_printf;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "read_all"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_strbuf_read_all;
-
-    type = SHARK_AS_CLASS(shark_table_get_str(module->names, "bytes"));
-    type->object_size = sizeof(shark_bytes);
-    type->destroy = shark_bytes_destroy;
-    type->is_object_class = false;
-
-    shark_bytes_class = type;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "init"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_bytes_init;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "put"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_bytes_put;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "put_short"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_bytes_put_short;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "put_int"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_bytes_put_int;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "puts"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_bytes_puts;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "tell"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_bytes_tell;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "patch"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_bytes_patch;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "patch_short"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_bytes_patch_short;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "patch_int"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_bytes_patch_int;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "get"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_bytes_get;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "encode"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_encode;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "decode"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_decode;
-
+    module = shark_vm_bind_module(vm, "system.string");
+    shark_vm_bind_function(vm, module, NULL, "itos", 1, shark_lib_itos);
+    shark_vm_bind_function(vm, module, NULL, "ftos", 1, shark_lib_ftos);
+    shark_vm_bind_function(vm, module, NULL, "ctos", 1, shark_lib_ctos);
+    shark_vm_bind_function(vm, module, NULL, "stoi", 1, shark_lib_stoi);
+    shark_vm_bind_function(vm, module, NULL, "stof", 1, shark_lib_stof);
+    shark_vm_bind_function(vm, module, NULL, "islower", 1, shark_lib_islower);
+    shark_vm_bind_function(vm, module, NULL, "isupper", 1, shark_lib_isupper);
+    shark_vm_bind_function(vm, module, NULL, "isalpha", 1, shark_lib_isalpha);
+    shark_vm_bind_function(vm, module, NULL, "isdigit", 1, shark_lib_isdigit);
+    shark_vm_bind_function(vm, module, NULL, "isalnum", 1, shark_lib_isalnum);
+    shark_vm_bind_function(vm, module, NULL, "isident", 1, shark_lib_isident);
+    shark_vm_bind_function(vm, module, NULL, "ishex", 1, shark_lib_ishex);
+    shark_vm_bind_function(vm, module, NULL, "isascii", 1, shark_lib_isascii);
+    shark_vm_bind_function(vm, module, NULL, "issurrogate", 1, shark_lib_issurrogate);
+    shark_vm_bind_function(vm, module, NULL, "tolower", 1, shark_lib_tolower);
+    shark_vm_bind_function(vm, module, NULL, "toupper", 1, shark_lib_toupper);
+    shark_vm_bind_function(vm, module, NULL, "len", 1, shark_lib_str_len);
+    shark_vm_bind_function(vm, module, NULL, "index", 2, shark_lib_str_index);
+    shark_vm_bind_function(vm, module, NULL, "slice", 3, shark_lib_str_slice);
+    shark_vm_bind_function(vm, module, NULL, "find", 2, shark_lib_find);
+    shark_vm_bind_function(vm, module, NULL, "concat", 2, shark_lib_concat);
+    shark_vm_bind_function(vm, module, NULL, "join", 2, shark_lib_join);
+    shark_vm_bind_function(vm, module, NULL, "split", 2, shark_lib_split);
+    shark_vm_bind_function(vm, module, NULL, "format", 2, shark_lib_format);
+    shark_vm_bind_function(vm, module, NULL, "normal", 1, shark_lib_normal);
+    shark_vm_bind_function(vm, module, NULL, "quote", 1, shark_lib_quote);
+    
+    type = shark_strbuf_class = shark_vm_bind_class(vm, module, "strbuf", sizeof(shark_strbuf), shark_strbuf_destroy, false);
+    shark_vm_bind_function(vm, module, type, "init", 0, shark_lib_strbuf_init);
+    shark_vm_bind_function(vm, module, type, "put", 1, shark_lib_strbuf_put);
+    shark_vm_bind_function(vm, module, type, "puts", 1, shark_lib_strbuf_puts);
+    shark_vm_bind_function(vm, module, type, "printf", 2, shark_lib_strbuf_printf);
+    shark_vm_bind_function(vm, module, type, "read_all", 0, shark_lib_strbuf_read_all);
+    
+    type = shark_bytes_class = shark_vm_bind_class(vm, module, "bytes", sizeof(shark_bytes), shark_bytes_destroy, false);
+    shark_vm_bind_function(vm, module, type, "init", 0, shark_lib_bytes_init);
+    shark_vm_bind_function(vm, module, type, "put", 1, shark_lib_bytes_put);
+    shark_vm_bind_function(vm, module, type, "put_short", 1, shark_lib_bytes_put_short);
+    shark_vm_bind_function(vm, module, type, "put_int", 1, shark_lib_bytes_put_int);
+    shark_vm_bind_function(vm, module, type, "puts", 1, shark_lib_bytes_puts);
+    shark_vm_bind_function(vm, module, type, "tell", 0, shark_lib_bytes_tell);
+    shark_vm_bind_function(vm, module, type, "patch", 2, shark_lib_bytes_patch);
+    shark_vm_bind_function(vm, module, type, "patch_short", 2, shark_lib_bytes_patch_short);
+    shark_vm_bind_function(vm, module, type, "patch_int", 2, shark_lib_bytes_patch_int);
+    shark_vm_bind_function(vm, module, type, "get", 2, shark_lib_bytes_get);
+    
+    shark_vm_bind_function(vm, module, NULL, "encode", 1, shark_lib_encode);
+    shark_vm_bind_function(vm, module, NULL, "decode", 1, shark_lib_decode);
+    
     // system.io
-    module_name = shark_string_new_from_cstr("system.io");
-    module = shark_vm_import_module(vm, module_name);
-
-    type = SHARK_AS_CLASS(shark_table_get_str(module->names, "text_file"));
-    type->object_size = sizeof(shark_file);
-    type->destroy = shark_default_destroy;
-    type->is_object_class = false;
-
-    shark_text_file_class = type;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "put"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_text_file_put;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "puts"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_text_file_puts;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "printf"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_text_file_printf;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "fetch"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_text_file_fetch;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "read"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_text_file_read;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "at_end"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_file_at_end;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "close"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_file_close;
-
-    type = SHARK_AS_CLASS(shark_table_get_str(module->names, "binary_file"));
-    type->object_size = sizeof(shark_file);
-    type->destroy = shark_default_destroy;
-    type->is_object_class = false;
-
-    shark_binary_file_class = type;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "put"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_binary_file_put;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "puts"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_binary_file_puts;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "fetch"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_binary_file_fetch;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "read"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_binary_file_read;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "at_end"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_file_at_end;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "close"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_file_close;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "open"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_open;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "put"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_put;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "puts"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_puts;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "printf"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_printf;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "read_line"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_read_line;
-
+    module = shark_vm_bind_module(vm, "system.io");
+    
+    type = shark_text_file_class = shark_vm_bind_class(vm, module, "text_file", sizeof(shark_file), shark_default_destroy, false);
+    shark_vm_bind_function(vm, module, type, "put", 1, shark_lib_text_file_put);
+    shark_vm_bind_function(vm, module, type, "puts", 1, shark_lib_text_file_puts);
+    shark_vm_bind_function(vm, module, type, "printf", 2, shark_lib_text_file_printf);
+    shark_vm_bind_function(vm, module, type, "fetch", 0, shark_lib_text_file_fetch);
+    shark_vm_bind_function(vm, module, type, "read", 1, shark_lib_text_file_read);
+    shark_vm_bind_function(vm, module, type, "at_end", 0, shark_lib_file_at_end);
+    shark_vm_bind_function(vm, module, type, "close", 0, shark_lib_file_close);
+    
+    type = shark_binary_file_class = shark_vm_bind_class(vm, module, "binary_file", sizeof(shark_file), shark_default_destroy, false);
+    shark_vm_bind_function(vm, module, type, "put", 1, shark_lib_binary_file_put);
+    shark_vm_bind_function(vm, module, type, "puts", 1, shark_lib_binary_file_puts);
+    shark_vm_bind_function(vm, module, type, "fetch", 0, shark_lib_binary_file_fetch);
+    shark_vm_bind_function(vm, module, type, "read", 1, shark_lib_binary_file_read);
+    shark_vm_bind_function(vm, module, type, "at_end", 0, shark_lib_file_at_end);
+    shark_vm_bind_function(vm, module, type, "close", 0, shark_lib_file_close);
+    
+    shark_vm_bind_function(vm, module, NULL, "open", 2, shark_lib_open);
+    shark_vm_bind_function(vm, module, NULL, "put", 1, shark_lib_put);
+    shark_vm_bind_function(vm, module, NULL, "puts", 1, shark_lib_puts);
+    shark_vm_bind_function(vm, module, NULL, "printf", 2, shark_lib_printf);
+    shark_vm_bind_function(vm, module, NULL, "read_line", 0, shark_lib_read_line);
+    
     // system.util
-    module_name = shark_string_new_from_cstr("system.util");
-    module = shark_vm_import_module(vm, module_name);
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "copy"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_copy;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "slice"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_slice;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "pop"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_pop;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "popindex"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_popindex;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "find"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_array_find;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "concat"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_array_concat;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "extend"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_extend;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "remove"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_remove;
-
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "update"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_update;
+    module = shark_vm_bind_module(vm, "system.util");
+    
+    shark_vm_bind_function(vm, module, NULL, "copy", 1, shark_lib_copy);
+    shark_vm_bind_function(vm, module, NULL, "slice", 3, shark_lib_slice);
+    shark_vm_bind_function(vm, module, NULL, "pop", 1, shark_lib_pop);
+    shark_vm_bind_function(vm, module, NULL, "popindex", 2, shark_lib_popindex);
+    shark_vm_bind_function(vm, module, NULL, "find", 2, shark_lib_array_find);
+    shark_vm_bind_function(vm, module, NULL, "concat", 2, shark_lib_array_concat);
+    shark_vm_bind_function(vm, module, NULL, "extend", 2, shark_lib_extend);
+    shark_vm_bind_function(vm, module, NULL, "remove", 2, shark_lib_remove);
+    shark_vm_bind_function(vm, module, NULL, "update", 2, shark_lib_update);
 }

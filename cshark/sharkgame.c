@@ -33,25 +33,66 @@
 #include "cshark_core.c"
 #include "cshark_system.c"
 
+#include "SDL_config.h"
+#if defined(__TINYC__) && defined(_WIN32) && defined(HAVE_STRINGS_H)
+#undef HAVE_STRINGS_H
+#define alloca      _ALLOCA
+#define SDL_DISABLE_IMMINTRIN_H
+#endif
+
 #include "SDL.h"
 #include "SDL_image.h"
 #include "SDL_ttf.h"
 #include "SDL2_rotozoom.h"
 #include "SDL_main.h"
 
+#define SHARK_DIRECT_RENDER
+
+#ifdef __PSP__
+    #define SHARK_DIRECT_DRAW   true
+    #ifndef SHARK_DIRECT_RENDER
+        #define SHARK_SOFT_RESCALE  true
+        #define SHARK_FAKE_SCALE    true
+    #endif
+    #define SHARK_SOFT_SCALE    1.5
+#endif
+
+#ifdef SHARK_SOFT_RESCALE
+    #define SHARK_SCALE_UP(x)   ((int) ((x) * SHARK_SOFT_SCALE))
+    #define SHARK_SCALE_DOWN(x) ((int) ((x) / SHARK_SOFT_SCALE))
+#else
+    #define SHARK_SCALE_UP(x)   (x)
+    #define SHARK_SCALE_DOWN(x) (x)
+#endif
+
 #define SHARK_NATIVE(name) \
     static shark_value shark_lib_ ## name(shark_vm *vm, shark_value *args, shark_error *error)
+
+#ifdef SHARK_DIRECT_RENDER
+    SDL_Window *window = NULL;
+    SDL_Renderer *renderer = NULL;
+#endif
 
 // shark.texture
 
 typedef struct {
     shark_object super;
+#ifndef SHARK_DIRECT_RENDER
     SDL_Surface *surface;
+#else
+    SDL_Texture *texture;
+    int w;
+    int h;
+#endif
 } shark_texture;
 
 static void shark_texture_destroy(shark_object *object)
 {
+#ifndef SHARK_DIRECT_RENDER
     SDL_FreeSurface(((shark_texture *) object)->surface);
+#else
+    SDL_DestroyTexture(((shark_texture *) object)->texture);
+#endif
 }
 
 static shark_class *shark_texture_class = NULL;
@@ -59,13 +100,21 @@ static shark_class *shark_texture_class = NULL;
 SHARK_NATIVE(texture_get_size_x)
 {
     shark_texture *texture = (shark_texture *) SHARK_AS_OBJECT(args[0]);
-    return SHARK_FROM_NUM(texture->surface->w);
+#ifndef SHARK_DIRECT_RENDER
+    return SHARK_FROM_NUM(SHARK_SCALE_DOWN(texture->surface->w));
+#else
+    return SHARK_FROM_NUM(texture->w);
+#endif
 }
 
 SHARK_NATIVE(texture_get_size_y)
 {
     shark_texture *texture = (shark_texture *) SHARK_AS_OBJECT(args[0]);
-    return SHARK_FROM_NUM(texture->surface->h);
+#ifndef SHARK_DIRECT_RENDER
+    return SHARK_FROM_NUM(SHARK_SCALE_DOWN(texture->surface->h));
+#else
+    return SHARK_FROM_NUM(texture->h);
+#endif
 }
 
 // shark.text
@@ -85,7 +134,7 @@ static shark_class *shark_font_class = NULL;
 
 SHARK_NATIVE(font_get_height)
 {
-    return SHARK_FROM_INT(TTF_FontHeight(((shark_font *) SHARK_AS_OBJECT(args[0]))->font));
+    return SHARK_FROM_INT(SHARK_SCALE_DOWN(TTF_FontHeight(((shark_font *) SHARK_AS_OBJECT(args[0]))->font)));
 }
 
 SHARK_NATIVE(font_get_width)
@@ -94,7 +143,7 @@ SHARK_NATIVE(font_get_width)
     TTF_SizeUTF8(((shark_font *) SHARK_AS_OBJECT(args[0]))->font,
         (char *) ((shark_string *) SHARK_AS_OBJECT(args[1]))->data,
         &height, &width);
-    return SHARK_FROM_INT(width);
+    return SHARK_FROM_INT(SHARK_SCALE_DOWN(width));
 }
 
 // shark.asset
@@ -116,7 +165,18 @@ SHARK_NATIVE(load_texture)
     }
     
     shark_texture *result = shark_object_new(shark_texture_class);
+#ifdef SHARK_DIRECT_RENDER
+    result->texture = SDL_CreateTextureFromSurface(renderer, image);
+    result->w = image->w;
+    result->h = image->h;
+    SDL_FreeSurface(image);
+#elif defined(SHARK_FAKE_SCALE)
+    SDL_Surface *render = zoomSurface(image, SHARK_SOFT_SCALE, SHARK_SOFT_SCALE, 1);
+    SDL_FreeSurface(image);
+    result->surface = render;
+#else
     result->surface = image;
+#endif
     
     return SHARK_FROM_PTR(result);
 }
@@ -126,9 +186,12 @@ SHARK_NATIVE(load_font)
     SHARK_ASSERT_STR(args[0], vm, "argument 1 of 'load_font'");
     SHARK_ASSERT_INT(args[1], vm, "argument 2 of 'load_font'");
     SHARK_ASSERT_INT(args[2], vm, "argument 3 of 'load_font'");
+    
     shark_string *name = SHARK_AS_STR(args[0]);
     shark_string *path = shark_path_join(asset_dir, name);
-    TTF_Font *font = TTF_OpenFont(path->data, (int) SHARK_AS_INT(args[1]));
+    
+    TTF_Font *font = TTF_OpenFont(path->data, (int) SHARK_SCALE_UP(SHARK_AS_INT(args[1])));
+    
     shark_object_dec_ref(path);
     
     if (font == NULL)
@@ -139,6 +202,7 @@ SHARK_NATIVE(load_font)
     
     shark_int_t color = SHARK_AS_INT(args[2]);
     shark_font *result = shark_object_new(shark_font_class);
+    
     result->font = font;
     result->color = (SDL_Color) {
         (color >> 24 ) & 0xFF, (color >> 16 ) & 0xFF,
@@ -152,8 +216,12 @@ SHARK_NATIVE(load_font)
 typedef struct {
     shark_table super;
     SDL_Window *window;
+#ifndef SHARK_DIRECT_RENDER
     SDL_Surface *window_display;
     SDL_Surface *display;
+#else
+    SDL_Renderer *renderer;
+#endif
 } shark_activity;
 
 void shark_activity_destroy(shark_object *self)
@@ -169,14 +237,6 @@ shark_activity *shark_activity_new()
 {
     shark_activity *self = shark_object_new(shark_activity_class);
     shark_table_init((shark_table *) self);
-#ifdef __PSP__
-    self->window = SDL_CreateWindow("SharkGame", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 480, 272, 0);
-#else
-    self->window = SDL_CreateWindow("Gameshark", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 320 * SHARK_SCALE, 192 * SHARK_SCALE, SDL_WINDOW_SHOWN);
-#endif
-    self->window_display = SDL_GetWindowSurface(self->window);
-    self->display = SDL_CreateRGBSurface(0, 320, 192, 32, 0, 0, 0, 0);
-    if (self->display == NULL) shark_fatal_error(NULL, "could not initialize display.");
     return self;
 }
 
@@ -185,13 +245,20 @@ SHARK_NATIVE(activity_draw)
     SHARK_ASSERT_INSTANCE(args[1], shark_texture_class, vm, "argument 1 of 'activity.draw'");
     SHARK_ASSERT_INT(args[2], vm, "argument 2 of 'activity.draw'");
     SHARK_ASSERT_INT(args[3], vm, "argument 3 of 'activity.draw'");
+    
     shark_activity *act = (shark_activity *) SHARK_AS_OBJECT(args[0]);
     shark_texture *tex = (shark_texture *) SHARK_AS_OBJECT(args[1]);
-    int x = (int) SHARK_AS_INT(args[2]);
-    int y = (int) SHARK_AS_INT(args[3]);
     
+    int x = (int) SHARK_SCALE_UP(SHARK_AS_INT(args[2]));
+    int y = (int) SHARK_SCALE_UP(SHARK_AS_INT(args[3]));
+    
+#ifndef SHARK_DIRECT_RENDER
     SDL_Rect dest = { x, y, tex->surface->w, tex->surface->h };
     SDL_BlitSurface(tex->surface, NULL, act->display, &dest);
+#else
+    SDL_Rect dest = { x, y, tex->w, tex->h };
+    SDL_RenderCopy(renderer, tex->texture, NULL, &dest);
+#endif
     
     return SHARK_NULL;
 }
@@ -206,30 +273,73 @@ SHARK_NATIVE(activity_draw_ex)
     SHARK_ASSERT_NUM(args[6], vm, "argument 6 of 'activity.draw_ex'");
     SHARK_ASSERT_NUM(args[7], vm, "argument 7 of 'activity.draw_ex'");
     SHARK_ASSERT_NUM(args[8], vm, "argument 8 of 'activity.draw_ex'");
+    
     shark_activity *act = (shark_activity *) SHARK_AS_OBJECT(args[0]);
     shark_texture *tex = (shark_texture *) SHARK_AS_OBJECT(args[1]);
-    int x = (int) SHARK_AS_INT(args[2]);
-    int y = (int) SHARK_AS_INT(args[3]);
-    int origin_x = (int) SHARK_AS_INT(args[4]);
-    int origin_y = (int) SHARK_AS_INT(args[5]);
+    
+    int x = (int) SHARK_SCALE_UP(SHARK_AS_INT(args[2]));
+    int y = (int) SHARK_SCALE_UP(SHARK_AS_INT(args[3]));
+    
+    int origin_x = (int) SHARK_SCALE_UP(SHARK_AS_INT(args[4]));
+    int origin_y = (int) SHARK_SCALE_UP(SHARK_AS_INT(args[5]));
+    
     double rotation = (double) SHARK_AS_NUM(args[6]);
+    
     double scale_x = (double) SHARK_AS_NUM(args[7]);
     double scale_y = (double) SHARK_AS_NUM(args[8]);
     
+#ifndef SHARK_DIRECT_RENDER
     SDL_Surface *render = rotozoomSurfaceXY(tex->surface, rotation, scale_x, scale_y, 1);
     
     double r = rotation * M_PI / 180;
+    
     int ox = (int) (cos(r) * origin_x + sin(r) * origin_y) * scale_x;
     int oy = (int) (cos(r) * origin_y + sin(r) * origin_x) * scale_y;
+    
     x = x + ox - render->w / 2;
     y = y + oy - render->h / 2;
     
     SDL_Rect dest = { x, y, render->w, render->h };
     SDL_BlitSurface(render, NULL, act->display, &dest);
     SDL_FreeSurface(render);
+#else
+    SDL_RendererFlip flip = SDL_FLIP_NONE;
+    
+    if (scale_x < 0)
+    {
+        flip |= SDL_FLIP_HORIZONTAL;
+        scale_x = -scale_x;
+    }
+    
+    if (scale_y < 0)
+    {
+        flip |= SDL_FLIP_VERTICAL;
+        scale_y = -scale_y;
+    }
+    
+    SDL_Rect dest = (SDL_Rect) {
+        x - (int) ((origin_x + (tex->w / 2)) * scale_x),
+        y - (int) ((origin_y + (tex->h / 2)) * scale_y),
+        (int) (tex->w * scale_x),
+        (int) (tex->h * scale_y)
+    };
+    
+    SDL_Point center = (SDL_Point) {
+        (int) ((origin_x + (tex->w / 2)) * scale_x),
+        (int) ((origin_y + (tex->h / 2)) * scale_y)
+    };
+    
+    SDL_RenderCopyEx(renderer, tex->texture, NULL, &dest, -rotation, &center, flip);
+#endif
     
     return SHARK_NULL;
 }
+
+#ifdef SHARK_DIRECT_RENDER
+#define TEXT_RENDER_MAX     512
+size_t TEXT_RENDER_COUNT = 0;
+SDL_Texture *TEXT_RENDER_BUFFER[TEXT_RENDER_MAX];
+#endif
 
 SHARK_NATIVE(activity_draw_text)
 {
@@ -241,13 +351,33 @@ SHARK_NATIVE(activity_draw_text)
     shark_activity *act = (shark_activity *) SHARK_AS_OBJECT(args[0]);
     shark_string *data = SHARK_AS_STR(args[1]);
     shark_font *font = (shark_font *) SHARK_AS_OBJECT(args[2]);
-    int x = (int) SHARK_AS_INT(args[3]);
-    int y = (int) SHARK_AS_INT(args[4]);
     
+    int x = (int) SHARK_SCALE_UP(SHARK_AS_INT(args[3]));
+    int y = (int) SHARK_SCALE_UP(SHARK_AS_INT(args[4]));
+    
+#ifdef SHARK_DIRECT_RENDER
+#ifdef __PSP__
+    SDL_Surface *render = TTF_RenderUTF8_Solid(font->font, data->data, font->color);
+#else
     SDL_Surface *render = TTF_RenderUTF8_Blended(font->font, data->data, font->color);
+#endif
+    SDL_Texture *texture = SDL_CreateTextureFromSurface(renderer, render);
+    SDL_FreeSurface(render);
+#else
+    SDL_Surface *render = TTF_RenderUTF8_Blended(font->font, data->data, font->color);
+#endif
     SDL_Rect dest = { x, y, render->w, render->h };
+#ifdef SHARK_DIRECT_RENDER
+    SDL_RenderCopy(renderer, texture, NULL, &dest);
+    
+    TEXT_RENDER_BUFFER[TEXT_RENDER_COUNT++] = texture;
+    
+    if (TEXT_RENDER_COUNT >= TEXT_RENDER_MAX)
+        shark_fatal_error(vm, "Text render buffer overflow.");
+#else
     SDL_BlitSurface(render, NULL, act->display, &dest);
     SDL_FreeSurface(render);
+#endif
     
     return SHARK_NULL;
 }
@@ -286,123 +416,63 @@ typedef enum {
     E_REL_Y = 15
 } shark_event;
 
-static void shark_init_game_library(shark_vm *vm, shark_string *library_path)
+static void shark_init_game_library(shark_vm *vm)
 {
-    shark_string *shark_archive_tail = shark_string_new_from_cstr("sharkgame.shar");
-    shark_string *shark_archive_name = shark_path_join(library_path, shark_archive_tail);
-    
-    FILE *shark_archive = fopen(shark_archive_name->data, "rb");
-    shark_object_dec_ref(shark_archive_name);
-    
-    if (shark_archive == NULL)
-    {
-        fprintf(stderr, "could not find the gameshark archive, aborting execution.");
-        exit(EXIT_FAILURE);
-    }
-    
-    shark_read_archive(vm, shark_archive_tail, shark_archive);
-    
-    shark_string *module_name;
     shark_module *module;
     shark_class *type;
     shark_function *function;
     
     // shark.activity
-    module_name = shark_string_new_from_cstr("shark.activity");
-    module = shark_vm_import_module(vm, module_name);
+    module = shark_vm_bind_module(vm, "shark.activity");
     
-    type = SHARK_AS_CLASS(shark_table_get_str(module->names, "activity"));
-    type->object_size = sizeof(shark_activity);
-    type->destroy = shark_activity_destroy;
-    
-    shark_activity_class = type;
-    
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "draw"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_activity_draw;
-    
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "draw_ex"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_activity_draw_ex;
-    
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "draw_text"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_activity_draw_text;
-    
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "launch"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_activity_empty;
-    
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "event"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_activity_empty;
-    
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "update"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_activity_empty;
-    
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "render"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_activity_empty;
+    type = shark_activity_class = shark_vm_bind_class(vm, module, "activity", sizeof(shark_activity), shark_activity_destroy, true);
+    shark_vm_bind_function(vm, module, type, "draw", 3, shark_lib_activity_draw);
+    shark_vm_bind_function(vm, module, type, "draw_ex", 8, shark_lib_activity_draw_ex);
+    shark_vm_bind_function(vm, module, type, "draw_text", 4, shark_lib_activity_draw_text);
+    shark_vm_bind_function(vm, module, type, "launch", 0, shark_lib_activity_empty);
+    shark_vm_bind_function(vm, module, type, "event", 3, shark_lib_activity_empty);
+    shark_vm_bind_function(vm, module, type, "update", 0, shark_lib_activity_empty);
+    shark_vm_bind_function(vm, module, type, "render", 0, shark_lib_activity_empty);
     
     // shark.asset
-    module_name = shark_string_new_from_cstr("shark.asset");
-    module = shark_vm_import_module(vm, module_name);
+    module = shark_vm_bind_module(vm, "shark.asset");
+    shark_vm_bind_function(vm, module, NULL, "load_texture", 1, shark_lib_load_texture);
+    shark_vm_bind_function(vm, module, NULL, "load_font", 3, shark_lib_load_font);
     
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "load_texture"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_load_texture;
-    
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "load_font"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_load_font;
+    // shark.event
+    module = shark_vm_bind_module(vm, "shark.event");
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_NONE")), SHARK_FROM_NUM(E_NONE));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_PRESS")), SHARK_FROM_NUM(E_PRESS));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_RELEASE")), SHARK_FROM_NUM(E_RELEASE));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_MOVE")), SHARK_FROM_NUM(E_MOVE));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_PRESS_UP")), SHARK_FROM_NUM(E_PRESS_UP));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_PRESS_DOWN")), SHARK_FROM_NUM(E_PRESS_DOWN));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_PRESS_LEFT")), SHARK_FROM_NUM(E_PRESS_LEFT));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_PRESS_RIGHT")), SHARK_FROM_NUM(E_PRESS_RIGHT));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_PRESS_X")), SHARK_FROM_NUM(E_PRESS_X));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_PRESS_Y")), SHARK_FROM_NUM(E_PRESS_Y));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_REL_UP")), SHARK_FROM_NUM(E_REL_UP));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_REL_DOWN")), SHARK_FROM_NUM(E_REL_DOWN));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_REL_LEFT")), SHARK_FROM_NUM(E_REL_LEFT));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_REL_RIGHT")), SHARK_FROM_NUM(E_REL_RIGHT));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_REL_X")), SHARK_FROM_NUM(E_REL_X));
+    shark_table_set_index(module->names, SHARK_FROM_PTR(shark_string_new_from_cstr("E_REL_Y")), SHARK_FROM_NUM(E_REL_Y));
     
     // shark.persistent
-    
-    module_name = shark_string_new_from_cstr("shark.persistent");
-    module = shark_vm_import_module(vm, module_name);
-    
-    function = SHARK_AS_FUNCTION(shark_table_get_str(module->names, "get_save_file"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_get_save_file;
+    module = shark_vm_bind_module(vm, "shark.persistent");
+    shark_vm_bind_function(vm, module, NULL, "get_save_file", 2, shark_lib_get_save_file);
     
     // shark.text
-    module_name = shark_string_new_from_cstr("shark.text");
-    module = shark_vm_import_module(vm, module_name);
-    
-    type = SHARK_AS_CLASS(shark_table_get_str(module->names, "font"));
-    type->object_size = sizeof(shark_font);
-    type->destroy = shark_font_destroy;
-    type->is_object_class = false;
-    
-    shark_font_class = type;
-    
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "get_height"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_font_get_height;
-    
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "get_width"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_font_get_width;
+    module = shark_vm_bind_module(vm, "shark.text");
+    type = shark_font_class = shark_vm_bind_class(vm, module, "font", sizeof(shark_font), shark_font_destroy, false);
+    shark_vm_bind_function(vm, module, type, "get_height", 0, shark_lib_font_get_height);
+    shark_vm_bind_function(vm, module, type, "get_width", 1, shark_lib_font_get_width);
     
     // shark.texture
-    module_name = shark_string_new_from_cstr("shark.texture");
-    module = shark_vm_import_module(vm, module_name);
-    
-    type = SHARK_AS_CLASS(shark_table_get_str(module->names, "texture"));
-    type->object_size = sizeof(shark_texture);
-    type->destroy = shark_texture_destroy;
-    type->is_object_class = false;
-    
-    shark_texture_class = type;
-    
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "get_size_x"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_texture_get_size_x;
-    
-    function = SHARK_AS_FUNCTION(shark_table_get_str(type->methods, "get_size_y"));
-    function->type = SHARK_NATIVE_FUNCTION;
-    function->code.native_code = shark_lib_texture_get_size_y;
+    module = shark_vm_bind_module(vm, "shark.texture");
+    type = shark_texture_class = shark_vm_bind_class(vm, module, "texture", sizeof(shark_texture), shark_texture_destroy, false);
+    shark_vm_bind_function(vm, module, type, "get_size_x", 0, shark_lib_texture_get_size_x);
+    shark_vm_bind_function(vm, module, type, "get_size_y", 0, shark_lib_texture_get_size_y);
 }
 
 #ifdef __PSP__
@@ -422,6 +492,27 @@ void shark_exec_game(shark_vm *vm)
     sceCtrlSetSamplingMode(PSP_CTRL_MODE_ANALOG);
 #endif
     
+#ifndef SHARK_DIRECT_RENDER
+    SDL_Window *window = NULL;
+#endif
+    
+#ifdef __PSP__
+    window = SDL_CreateWindow("SharkGame", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 480, 272, 0);
+#else
+    window = SDL_CreateWindow("SharkGame", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, 320 * SHARK_SCALE, 192 * SHARK_SCALE, SDL_WINDOW_SHOWN);
+#endif
+    
+#ifdef SHARK_DIRECT_RENDER
+    renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
+    #ifdef __PSP__
+        SDL_RenderSetScale(renderer, 1.5, 1.42);
+    #elif defined(SHARK_SOFT_SCALE)
+        SDL_RenderSetScale(renderer, SHARK_SOFT_SCALE, SHARK_SOFT_SCALE);
+    #else
+        SDL_RenderSetScale(renderer, SHARK_SCALE, SHARK_SCALE);
+    #endif
+#endif
+    
     shark_string *main_name = shark_string_new_from_cstr("main");
     shark_module *module = shark_vm_import_module(vm, main_name);
     
@@ -430,6 +521,17 @@ void shark_exec_game(shark_vm *vm)
     
     shark_activity *main = shark_activity_new();
     ((shark_object *) main)->type = main_class;
+    
+#ifndef SHARK_DIRECT_RENDER
+    main->window = window;
+    main->window_display = SDL_GetWindowSurface(main->window);
+    #ifndef SHARK_DIRECT_DRAW
+        main->display = SDL_CreateRGBSurface(0, 320, 192, 32, 0, 0, 0, 0);
+    #else
+        main->display = main->window_display;
+    #endif
+    if (main->display == NULL) shark_fatal_error(NULL, "could not initialize display.");
+#endif
     
 #define PUSH(value) { \
                     shark_value __PUSH_VALUE__ = value; \
@@ -447,15 +549,7 @@ void shark_exec_game(shark_vm *vm)
         error.message = NULL; \
         vm->error = &error; \
         if (method->type == SHARK_BYTECODE_FUNCTION) { \
-            shark_vm_frame frame; \
-            frame.parent = NULL; \
-            frame.module = module; \
-            frame.function = method; \
-            frame.globals = module->names; \
-            frame.const_table = module->const_table; \
-            frame.base = 0; \
-            frame.code = method->code.bytecode; \
-            shark_vm_execute(vm, frame); \
+            shark_vm_execute(vm, NULL, module, method); \
         } else { \
             method->code.native_code(vm, vm->stack, &error); \
         } \
@@ -467,6 +561,8 @@ void shark_exec_game(shark_vm *vm)
     SHARK_CALL_METHOD("launch");
     
     bool pressed = false;
+    
+    unsigned long max_delta = 1000 / 24;
 #ifdef __PSP__
     unsigned long last = 0;
 #endif
@@ -474,6 +570,8 @@ void shark_exec_game(shark_vm *vm)
     while (true)
     {
         SDL_Event event;
+        
+        unsigned long time = SDL_GetTicks();
         
 #define DISPATCH_EVENT(type, x, y) do { \
     PUSH(SHARK_FROM_PTR(main)); \
@@ -603,18 +701,39 @@ void shark_exec_game(shark_vm *vm)
         PUSH(SHARK_FROM_PTR(main));
         SHARK_CALL_METHOD("update");
         
+#ifdef SHARK_DIRECT_RENDER
+        SDL_RenderClear(renderer);
+#endif
+        
         PUSH(SHARK_FROM_PTR(main));
         SHARK_CALL_METHOD("render");
         
+#ifndef SHARK_DIRECT_RENDER
         main->window_display = SDL_GetWindowSurface(main->window);
-        SDL_BlitScaled(main->display, NULL, main->window_display, NULL);
-        
-        SDL_UpdateWindowSurface(main->window);
-#ifndef __PSP__
-        SDL_Delay(1000 / 24);
+#ifdef __PSP__
+    #ifndef SHARK_SOFT_RESCALE
+        SDL_Rect main_rect = (SDL_Rect) { 80, 40, 320, 192 };
+        SDL_BlitSurface(main->display, NULL, main->window_display, &main_rect);
+    #endif
 #else
-        SDL_Delay(1000 / 24);
+        SDL_BlitScaled(main->display, NULL, main->window_display, NULL);
 #endif
+        SDL_UpdateWindowSurface(main->window);
+#else
+        SDL_RenderPresent(renderer);
+        
+        for (size_t i = 0; i < TEXT_RENDER_COUNT; i++)
+            SDL_DestroyTexture(TEXT_RENDER_BUFFER[i]);
+        
+        TEXT_RENDER_COUNT = 0;
+#endif
+        
+        unsigned long delta = SDL_GetTicks() - time;
+        
+        if (delta >= max_delta)
+            continue;
+        
+        SDL_Delay(max_delta - delta);
     }
 #undef PUSH
 #undef SHARK_CALL_METHOD
@@ -624,7 +743,7 @@ end:
     TTF_Quit();
 }
 
-#if defined(_WIN32) || defined(__PSP__)
+#if (defined(_WIN32) || defined(__PSP__)) && !defined(__TINYC__)
 int SDL_main(int argc, char **argv)
 #else
 int main(int argc, char **argv)
@@ -643,8 +762,8 @@ int main(int argc, char **argv)
         shark_string *base = shark_path_get_base(exec);
 #endif
         shark_vm_add_import_path(vm, base);
-        shark_init_library(vm, base);
-        shark_init_game_library(vm, base);
+        shark_init_library(vm);
+        shark_init_game_library(vm);
 #ifdef __PSP__
         shark_string *gamedir = shark_string_new_from_cstr("");
         shark_string *filename = shark_string_new_from_cstr("bin/game.shar");

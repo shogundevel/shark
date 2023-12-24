@@ -33,6 +33,8 @@ import sharkc.backend.cshark.OP
 import sharkc.backend.cshark.CONST
 import sharkc.error: compiler_error
 
+var NULL = "null"
+
 var binary_operators = {"==": OP::EQ,
                         "!=": OP::NE,
                         "not": OP::NOT_IN,
@@ -45,7 +47,12 @@ var binary_operators = {"==": OP::EQ,
                         "-": OP::SUB,
                         "*": OP::MUL,
                         "/": OP::DIV,
-                        "%": OP::MOD}
+                        "%": OP::MOD,
+                        "&": OP::BAND,
+                        "|": OP::BOR,
+                        "^": OP::BXOR,
+                        "<~": OP::BSHL,
+                        "~>": OP::BSHR}
 
 var short_circuit_operator = {"and": OP::AND, "or": OP::OR}
 
@@ -80,7 +87,7 @@ class bytecode_generator
     
     function put_str(str)
         var data = encode(str)
-        self.block.put_int(data.tell())
+        self.block.put_short(data.tell())
         self.block.puts(data)
     
     function get_local()
@@ -93,7 +100,7 @@ class bytecode_generator
     
     function exit()
         self.block.put(OP::EXIT)
-        self.block.put_short(sizeof(self.context.namespace))
+        self.block.put(sizeof(self.context.namespace))
         self.local_id -= sizeof(self.context.namespace)
         self.context = self.context.parent
     
@@ -104,7 +111,7 @@ class bytecode_generator
             return local
         else
             self.block.put(OP::DEFINE)
-            self.block.put_int(self.const(CONST::SYMBOL, name))
+            self.block.put_short(self.const(CONST::SYMBOL, name))
             return name
     
     function start(compiler, filename, out)
@@ -165,7 +172,7 @@ class bytecode_generator
         const_table_size += sizeof(self.const_table[CONST::CHAR])
         const_table_size += sizeof(self.const_table[CONST::STR])
         const_table_size += sizeof(self.const_table[CONST::SYMBOL])
-        self.main_block.put_int(const_table_size)
+        self.main_block.put_short(const_table_size)
         self.main_block.puts(self.const_block)
         self.main_block.put_int(self.init_block.tell())
         self.main_block.puts(self.init_block)
@@ -194,20 +201,20 @@ class bytecode_generator
             if name in context.namespace then
                 return context.namespace[name]
             context = context.parent
-        return null
+        return NULL
     
     function name(name)
         var local = self.search(name)
-        if local == null then
+        if local == NULL then
             self.block.put(OP::LOAD_GLOBAL)
-            self.block.put_int(self.const(CONST::SYMBOL, name))
+            self.block.put_short(self.const(CONST::SYMBOL, name))
         else
             self.block.put(OP::LOAD)
-            self.block.put_short(local)
+            self.block.put(local)
     
     function get_static(field)
         self.block.put(OP::GET_STATIC)
-        self.block.put_int(self.const(CONST::SYMBOL, field))
+        self.block.put_short(self.const(CONST::SYMBOL, field))
     
     function const(type, value)
         if value in self.const_table[type] then
@@ -232,7 +239,7 @@ class bytecode_generator
     function enter_class(name)
         self.class_context = name
         self.block.put(OP::ENTER_CLASS)
-        self.block.put_int(self.const(CONST::SYMBOL, name))
+        self.block.put_short(self.const(CONST::SYMBOL, name))
     
     function exit_class(empty)
         self.class_context = null
@@ -246,8 +253,8 @@ class bytecode_generator
     
     function enter_function(name, args, has_body)
         self.block.put(OP::FUNCTION)
-        self.block.put_short(sizeof(args))
-        self.block.put_int(self.const(CONST::SYMBOL, name))
+        self.block.put(sizeof(args))
+        self.block.put_short(self.const(CONST::SYMBOL, name))
         if has_body then
             self.local_id = 0
             self.function_context = name
@@ -364,12 +371,12 @@ class bytecode_generator
     
     function for_cond(start, _end)
         self.block.put(OP::INC)
-        self.block.put_short(start)
+        self.block.put(start)
         self.block.patch_short(self.skip_label, self.block.tell() - self.skip_label)
         self.block.put(OP::LOAD)
-        self.block.put_short(start)
+        self.block.put(start)
         self.block.put(OP::LOAD)
-        self.block.put_short(_end)
+        self.block.put(_end)
         self.block.put(OP::LT)
         self.loop_cond()
     
@@ -401,12 +408,12 @@ class bytecode_generator
         self.skip_label = self.enter_loop()
         self.for_cond(start, _end)
         self.block.put(OP::LOAD)
-        self.block.put_short(iter)
+        self.block.put(iter)
         self.block.put(OP::LOAD)
-        self.block.put_short(start)
+        self.block.put(start)
         self.block.put(OP::GET_INDEX)
         self.block.put(OP::STORE)
-        self.block.put_short(self.loop_value)
+        self.block.put(self.loop_value)
     
     function end_for()
         self.exit_loop()
@@ -419,7 +426,7 @@ class bytecode_generator
             block_size += sizeof(context.namespace)
             context = context.parent
         self.block.put(OP::EXIT)
-        self.block.put_short(block_size)
+        self.block.put(block_size)
         self.block.put(OP::LOOP)
         self.block.put_short(self.block.tell() - target)
     
@@ -463,6 +470,8 @@ class bytecode_generator
     function unary_op(op)
         if op == "not" then
             self.block.put(OP::NOT)
+        else if op == "~" then
+            self.block.put(OP::BNOT)
         else
             self.block.put(OP::NEG)
     
@@ -499,12 +508,12 @@ class bytecode_generator
     
     function get_field(field)
         self.block.put(OP::GET_FIELD)
-        self.block.put_int(self.const(CONST::SYMBOL, field))
+        self.block.put_short(self.const(CONST::SYMBOL, field))
     
     function method_call(name)
         self.block.put(OP::METHOD_CALL)
         self.block.put(self.call_args)
-        self.block.put_int(self.const(CONST::SYMBOL, name))
+        self.block.put_short(self.const(CONST::SYMBOL, name))
         self.exit_call()
     
     function set_field(field, op)
@@ -513,7 +522,7 @@ class bytecode_generator
         else
             self.block.put(OP::SET_FIELD_AU)
             self.block.put(assign_operators[op])
-        self.block.put_int(self.const(CONST::SYMBOL, field))
+        self.block.put_short(self.const(CONST::SYMBOL, field))
     
     function set_static(field, op)
         if op == "=" then
@@ -521,26 +530,26 @@ class bytecode_generator
         else
             self.block.put(OP::SET_STATIC_AU)
             self.block.put(assign_operators[op])
-        self.block.put_int(self.const(CONST::SYMBOL, field))
+        self.block.put_short(self.const(CONST::SYMBOL, field))
     
     function set_name(name, op)
         var target = self.search(name)
-        if target == null then
+        if target == NULL then
             if op != "=" then
                 self.block.put(OP::LOAD_GLOBAL)
-                self.block.put_int(self.const(CONST::SYMBOL, target))
+                self.block.put_short(self.const(CONST::SYMBOL, target))
                 self.block.put(OP::SWAP)
                 self.block.put(assign_operators[op])
             self.block.put(OP::STORE_GLOBAL)
-            self.block.put_int(self.const(CONST::SYMBOL, name))
+            self.block.put_short(self.const(CONST::SYMBOL, name))
         else
             if op != "=" then
                 self.block.put(OP::LOAD)
-                self.block.put_short(target)
+                self.block.put(target)
                 self.block.put(OP::SWAP)
                 self.block.put(assign_operators[op])
             self.block.put(OP::STORE)
-            self.block.put_short(target)
+            self.block.put(target)
     
     function enter_super_call()
         self.block.put(OP::SELF)
@@ -605,16 +614,20 @@ class bytecode_generator
     
     function int_literal(value)
         self.block.put(OP::CONST)
-        self.block.put_int(self.const(CONST::INT, value))
+        self.block.put_short(self.const(CONST::INT, value))
+    
+    function hex_literal(value)
+        self.block.put(OP::CONST)
+        self.block.put_short(self.const(CONST::INT, value))
     
     function float_literal(value)
         self.block.put(OP::CONST)
-        self.block.put_int(self.const(CONST::FLOAT, value))
+        self.block.put_short(self.const(CONST::FLOAT, value))
     
     function char_literal(value)
         self.block.put(OP::CONST)
-        self.block.put_int(self.const(CONST::CHAR, normal(value)))
+        self.block.put_short(self.const(CONST::CHAR, normal(value)))
     
     function string_literal(value)
         self.block.put(OP::CONST)
-        self.block.put_int(self.const(CONST::STR, normal(value)))
+        self.block.put_short(self.const(CONST::STR, normal(value)))

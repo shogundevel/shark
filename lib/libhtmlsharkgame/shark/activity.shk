@@ -36,23 +36,50 @@ var pressed = false
 function on_mouse_down(ev)
     pressed = true
     if ev.clientX then
-        main.event(event::E_PRESS, ev.clientX / 3, ev.clientY / 3)
+        main.event(event::E_PRESS, (ev.clientX - context_border_x) / context_size_x, (ev.clientY - context_border_y) / context_size_y)
     else
-        main.event(event::E_PRESS, ev.screenX / 3, ev.screenY / 3)
+        main.event(event::E_PRESS, (ev.screenX - context_border_x) / context_size_x, (ev.screenY - context_border_y) / context_size_y)
 
 function on_mouse_up(ev)
     pressed = false
     if ev.clientX then
-        main.event(event::E_RELEASE, ev.clientX / 3, ev.clientY / 3)
+        main.event(event::E_RELEASE, (ev.clientX - context_border_x) / context_size_x, (ev.clientY - context_border_y) / context_size_y)
     else
-        main.event(event::E_RELEASE, ev.screenX / 3, ev.screenY / 3)
+        main.event(event::E_RELEASE, (ev.screenX - context_border_x) / context_size_x, (ev.screenY - context_border_y) / context_size_y)
 
 function on_mouse_move(ev)
     if pressed then
         if ev.clientX then
-            main.event(event::E_MOVE, ev.clientX / 3, ev.clientY / 3)
+            main.event(event::E_MOVE, (ev.clientX - context_border_x) / context_size_x, (ev.clientY - context_border_y) / context_size_y)
         else
-            main.event(event::E_MOVE, ev.screenX / 3, ev.screenY / 3)
+            main.event(event::E_MOVE, (ev.screenX - context_border_x) / context_size_x, (ev.screenY - context_border_y) / context_size_y)
+
+function on_touch_down(ev)
+    ev.preventDefault()
+    ev = ev.changedTouches[ev.changedTouches.length - 1]
+    pressed = true
+    if ev.clientX then
+        main.event(event::E_PRESS, (ev.clientX - context_border_x) / context_size_x, (ev.clientY - context_border_y) / context_size_y)
+    else
+        main.event(event::E_PRESS, (ev.screenX - context_border_x) / context_size_x, (ev.screenY - context_border_y) / context_size_y)
+
+function on_touch_up(ev)
+    ev.preventDefault()
+    ev = ev.changedTouches[ev.changedTouches.length - 1]
+    pressed = false
+    if ev.clientX then
+        main.event(event::E_RELEASE, (ev.clientX - context_border_x) / context_size_x, (ev.clientY - context_border_y) / context_size_y)
+    else
+        main.event(event::E_RELEASE, (ev.screenX - context_border_x) / context_size_x, (ev.screenY - context_border_y) / context_size_y)
+
+function on_touch_move(ev)
+    ev.preventDefault()
+    ev = ev.changedTouches[ev.changedTouches.length - 1]
+    if pressed then
+        if ev.clientX then
+            main.event(event::E_MOVE, (ev.clientX - context_border_x) / context_size_x, (ev.clientY - context_border_y) / context_size_y)
+        else
+            main.event(event::E_MOVE, (ev.screenX - context_border_x) / context_size_x, (ev.screenY - context_border_y) / context_size_y)
 
 var console
 
@@ -119,17 +146,54 @@ function on_key_up(ev)
     ev.preventDefault()
 
 var window
+var element = null
+var context = null
+var context_size_x = 1
+var context_size_y = 1
+var context_size_z = 1
+var context_border_x = 0
+var context_border_y = 0
+
+function set_element_size()
+    context.scale(1 / context_size_z, 1 / context_size_z)
+    context.translate(-context_border_x, -context_border_y)
+    element.width = window.innerWidth
+    element.height = window.innerHeight
+    context_size_x = element.width / 320
+    context_size_y = element.height / 192
+    if context_size_x > context_size_y then
+        context_size_z = context_size_y
+        context_border_x = (element.width - 320 * context_size_y) / 2
+        context_border_y = 0
+    else if context_size_y > context_size_x then
+        context_size_z = context_size_x
+        context_border_x = 0
+        context_border_y = (element.height - 192 * context_size_x) / 2
+    else
+        context_size_z = context_size_x
+        context_border_x = 0
+        context_border_y = 0
+    context.fillStyle = "black"
+    context.fillRect(0, 0, element.width, element.height)
+    context.translate(context_border_x, context_border_y)
+    context.scale(context_size_z, context_size_z)
+    context.textBaseline = "top"
 
 class activity
     function init()
-        var element = document.getElementById("screen")
-        self.context = element.getContext("2d")
-        self.context.scale(3, 3)
+        element = document.getElementById("screen")
+        context = element.getContext("2d")
+        set_element_size()
+        self.context = context
         self.context.textColor = "#000000FF"
         self.context.textBaseline = "top"
+        window.addEventListener("resize", set_element_size, false)
         window.addEventListener("mousedown", on_mouse_down, false)
         window.addEventListener("mouseup", on_mouse_up, false)
         window.addEventListener("mousemove", on_mouse_move, false)
+        window.addEventListener("touchstart", on_touch_down, false)
+        window.addEventListener("touchend", on_touch_up, false)
+        window.addEventListener("touchmove", on_touch_move, false)
         window.addEventListener("keyup", on_key_up, false)
         window.addEventListener("keydown", on_key_down, false)
     

@@ -388,7 +388,7 @@ SHARK_API size_t shark_value_hash(shark_value x)
     if (SHARK_IS_OBJECT(x) && SHARK_AS_OBJECT(x)->type == &shark_string_class)
         return SHARK_AS_STR(x)->hash;
     else
-        return (size_t) x.INT;
+        return ((size_t) x.INT) + 1;
 #endif
 }
 
@@ -416,12 +416,16 @@ SHARK_API bool shark_value_equals(shark_value x, shark_value y)
             shark_fatal_error(NULL, "unknown value type.");
     }
 #else
-    if (SHARK_IS_OBJECT(x) && SHARK_IS_OBJECT(y)
-    && SHARK_AS_OBJECT(x)->type == SHARK_AS_OBJECT(y)->type
-    && SHARK_AS_OBJECT(x)->type == &shark_string_class)
-        return shark_string_equals(SHARK_AS_STR(x), SHARK_AS_STR(y));
-    else
+    if (SHARK_IS_OBJECT(x) && SHARK_IS_OBJECT(y)) {
+        if (SHARK_AS_OBJECT(x) == SHARK_AS_OBJECT(y))
+            return true;
+        else if (SHARK_AS_OBJECT(x)->type == SHARK_AS_OBJECT(y)->type
+        && SHARK_AS_OBJECT(x)->type == &shark_string_class)
+            return shark_string_equals(SHARK_AS_STR(x), SHARK_AS_STR(y));
+        return false;
+    } else {
         return x.INT == y.INT;
+    }
 #endif
 }
 
@@ -608,7 +612,7 @@ static shark_class shark_module_class = {
                     | (((uint32_t) fetch) << 24))
 
 #define fetch_str(dest) { \
-    size_t size = (size_t) fetch_int; \
+    size_t size = (size_t) fetch_short; \
     dest = shark_object_new(&shark_string_class); \
     dest->size = size; \
     uint8_t *data = shark_malloc(size * sizeof(uint8_t) + 1); \
@@ -629,7 +633,7 @@ static shark_module *shark_read_module(shark_string *name, FILE *source)
     size_t import_section_size = (size_t) fetch_short;
     shark_array *import_table = shark_array_new();
     module->import_table = import_table;
-
+    
     for (size_t i = 0; i < import_section_size; i++)
     {
         shark_string *import_path;
@@ -659,7 +663,7 @@ static shark_module *shark_read_module(shark_string *name, FILE *source)
         }
     }
 
-    size_t const_table_size = (size_t) fetch_int;
+    size_t const_table_size = (size_t) fetch_short;
     shark_value *const_table = shark_malloc(const_table_size * sizeof(shark_value));
 
     module->const_table_size = const_table_size;
@@ -679,7 +683,7 @@ static shark_module *shark_read_module(shark_string *name, FILE *source)
             }
             case CONST_FLOAT:
             {
-                size_t size = (size_t) fetch_int;
+                size_t size = (size_t) fetch_short;
                 char data[size + 1];
                 data[size] = '\0';
                 for (size_t i = 0; i < size; i++)
@@ -689,7 +693,7 @@ static shark_module *shark_read_module(shark_string *name, FILE *source)
             }
             case CONST_CHAR:
             {
-                size_t char_size = (size_t) fetch_int;
+                size_t char_size = (size_t) fetch_short;
                 if (char_size == 1)
                     value = SHARK_FROM_CHAR(fetch);
                 else
@@ -798,7 +802,7 @@ SHARK_API shark_module *shark_read_archive(shark_vm *vm, shark_string *name, voi
 SHARK_API shark_string *shark_path_get_base(shark_string *path)
 {
     int64_t index;
-    for (index = path->size - 1; index >= 0; index--) {
+    for (index = path->size - 1; index > 0; index--) {
         if (path->data[index] == '\\' || path->data[index] == '/')
             break;
     }
@@ -816,7 +820,7 @@ SHARK_API shark_string *shark_path_get_tail(shark_string *path)
         if (path->data[index] == '\\' || path->data[index] == '/')
             break;
     }
-    size_t size = path->size - index + 1;
+    size_t size = path->size - index - 1;
     shark_string *tail = shark_string_new_with_size(size);
     memcpy(tail->data, path->data + index + 1, size);
     shark_string_init(tail);
@@ -987,6 +991,63 @@ SHARK_API shark_vm *shark_vm_new()
     return self;
 }
 
+SHARK_API shark_module *shark_vm_bind_module(shark_vm *vm, char *name)
+{
+    shark_module *module = shark_object_new(&shark_module_class);
+    
+    module->name = shark_string_new_from_cstr(name);
+    module->names = shark_table_new();
+    
+    module->import_table = NULL;
+    module->const_table_size = 0;
+    module->const_table = NULL;
+    module->code = NULL;
+    
+    shark_table_set_index(vm->import_record, SHARK_FROM_PTR(module->name), SHARK_FROM_PTR(module));
+    
+    return module;
+}
+
+SHARK_API shark_class *shark_vm_bind_class(shark_vm *vm, shark_module *module, char *name, size_t object_size, void (*destroy)(shark_object *), bool is_object_class)
+{
+    shark_class *type = shark_class_new(shark_string_new_from_cstr(name), NULL);
+    type->object_size = object_size;
+    type->destroy = destroy;
+    type->is_object_class = is_object_class;
+    shark_table_set_index(module->names, SHARK_FROM_PTR(type->name), SHARK_FROM_PTR(type));
+    shark_object_dec_ref(type);
+    return type;
+}
+
+SHARK_API shark_function *shark_vm_bind_function(shark_vm *vm, shark_module *module, shark_class *type, char *name, size_t arity, shark_native_function code)
+{
+    shark_function *function = shark_object_new(&shark_function_class);
+    
+    function->arity = arity;
+    function->name = shark_string_new_from_cstr(name);
+    
+    if (type != NULL) {
+        function->is_method = true;
+        function->owner_class = shark_object_inc_ref(type);
+        function->supermethod = shark_object_inc_ref(SHARK_AS_OBJECT(
+            shark_table_get_index(type->methods, SHARK_FROM_PTR(function->name))));
+        shark_table_set_index(type->methods,
+            SHARK_FROM_PTR(function->name), SHARK_FROM_PTR(function));
+    } else {
+        function->is_method = false;
+        function->owner_class = NULL;
+        function->supermethod = NULL;
+        shark_table_set_index(module->names,
+            SHARK_FROM_PTR(function->name), SHARK_FROM_PTR(function));
+    }
+    
+    function->owner = shark_object_inc_ref(module);
+    function->type = SHARK_NATIVE_FUNCTION;
+    function->code.native_code = code;
+    
+    return function;
+}
+
 SHARK_API void shark_vm_add_import_path(shark_vm *self, shark_string *import_path)
 {
     shark_array_put(self->import_path, SHARK_FROM_PTR(import_path));
@@ -1023,9 +1084,24 @@ static void shark_vm_grow_stack(shark_vm *self)
     self->stack = new_stack;
 }
 
-SHARK_API shark_value shark_vm_execute(shark_vm *self, shark_vm_frame frame)
+SHARK_API shark_value shark_vm_execute(shark_vm *self, shark_vm_frame *prev, shark_module *module, shark_function *code)
 {
-
+    shark_vm_frame frame;
+    
+    frame.parent = prev;
+    frame.module = module;
+    frame.function = code;
+    frame.globals = module->names;
+    frame.const_table = module->const_table;
+    
+    if (code != NULL) {
+        frame.base = self->TOS - code->arity - (code->is_method ? 1 : 0);
+        frame.code = code->code.bytecode;
+    } else {
+        frame.base = self->TOS;
+        frame.code = module->code;
+    }
+    
 #define FETCH           (*(frame.code++))
 
 #define FETCH_SHORT     (((uint16_t) FETCH) \
@@ -1046,7 +1122,7 @@ SHARK_API shark_value shark_vm_execute(shark_vm *self, shark_vm_frame frame)
 
 #define POP         self->stack[--self->TOS]
 
-#define CONST   (frame.const_table[FETCH_INT])
+#define CONST   (frame.const_table[FETCH_SHORT])
 
 #define DEC_REF(x)  shark_object_dec_ref(SHARK_AS_OBJECT(x))
     
@@ -1081,7 +1157,7 @@ end:
             PUSH(shark_table_get_index(frame.globals, CONST));
             break;
         case OP_LOAD:
-            PUSH(self->stack[frame.base + FETCH_SHORT]);
+            PUSH(self->stack[frame.base + FETCH]);
             break;
         case OP_GET_FIELD: {
             shark_value object = POP;
@@ -1120,7 +1196,7 @@ end:
             break;
         case OP_FUNCTION: {
             shark_function *function = shark_object_new(&shark_function_class);
-            function->arity = (size_t) FETCH_SHORT;
+            function->arity = (size_t) FETCH;
             function->name = shark_object_inc_ref(SHARK_AS_STR(CONST));
             if (current_class != NULL) {
                 function->is_method = true;
@@ -1148,7 +1224,7 @@ end:
             shark_fatal_error(self, "function is not implemented.");
             break;
         case OP_EXIT: {
-            size_t block_size = (size_t) FETCH_SHORT;
+            size_t block_size = (size_t) FETCH;
             for (size_t i = 0; i < block_size; i++)
                 shark_value_dec_ref(POP);
             break;
@@ -1253,15 +1329,14 @@ end:
         }
 
 #define FUNCTION_CALL(callee, argc, self_offset) \
-    if (argc != callee->arity) \
+    if (argc != callee->arity) { \
+        fprintf(stderr, "while calling function '%s': ", callee->name->data); \
         shark_fatal_error(self, "arity mismatch in function call."); \
+    } \
     shark_module *module = callee->owner; \
     shark_value result; \
     if (callee->type == SHARK_BYTECODE_FUNCTION) { \
-        result = shark_vm_execute(self, (shark_vm_frame) { &frame, module, callee, \
-            module->names, module->const_table, \
-            self->TOS - argc - self_offset, \
-            callee->code.bytecode }); \
+        result = shark_vm_execute(self, &frame, module, callee); \
         if (!self_offset) DEC_REF(POP); \
     } else { \
         shark_vm_frame child = { &frame, module, callee, \
@@ -1464,7 +1539,7 @@ end:
             break;
         }
         case OP_STORE:
-            self->stack[frame.base + FETCH_SHORT] = POP;
+            self->stack[frame.base + FETCH] = POP;
             break;
         case OP_SET_STATIC: {
             shark_value value = POP;
@@ -1575,7 +1650,7 @@ end:
             PUSH(SHARK_FROM_NUM(0));
             break;
         case OP_INC: {
-            uint16_t local = FETCH_SHORT;
+            uint16_t local = FETCH;
             shark_value value = self->stack[frame.base + local];
             if (!SHARK_IS_NUM(value))
                 shark_fatal_error(self, "can't increment a non numeric value.");
@@ -1689,6 +1764,27 @@ end:
             current_table = current;
             break;
         }
+#define BINARY_BINOP(CODE, OP, NAME)    case CODE: { \
+    shark_value y = POP; \
+    shark_value x = POP; \
+    if (!SHARK_IS_INT(x) || !SHARK_IS_INT(y)) \
+        shark_fatal_error(self, "unsupported operand types for " #NAME " operator."); \
+    PUSH(SHARK_FROM_INT(((uint32_t) SHARK_AS_INT(x)) OP ((uint32_t) SHARK_AS_INT(y)))); \
+    break; \
+}
+        BINARY_BINOP(OP_BAND, &, &)
+        BINARY_BINOP(OP_BOR, |, |)
+        BINARY_BINOP(OP_BXOR, ^, ^)
+        BINARY_BINOP(OP_BSHL, <<, left_shift)
+        BINARY_BINOP(OP_BSHR, >>, right_shift)
+#undef BINARY_BINOP
+        case OP_BNOT: {
+            shark_value x = POP;
+            if (!SHARK_IS_INT(x))
+                shark_fatal_error(self, "unsupported operand for ~ unary op.");
+            PUSH(SHARK_FROM_INT(~((uint32_t) SHARK_AS_INT(x))));
+            break;
+        }
         default:
             fprintf(stderr, "usuported operation: %d\n", *(--frame.code));
             shark_fatal_error(self, "");
@@ -1728,16 +1824,7 @@ SHARK_API void shark_vm_exec_module(shark_vm *self, shark_module *module)
     error.message = NULL;
     self->error = &error;
     
-    shark_vm_frame frame;
-    frame.parent = NULL;
-    frame.module = module;
-    frame.function = NULL;
-    frame.globals = module->names;
-    frame.const_table = module->const_table;
-    frame.base = self->TOS;
-    frame.code = module->code;
-    
-    shark_vm_execute(self, frame);
+    shark_vm_execute(self, NULL, module, NULL);
 }
 
 SHARK_API shark_value shark_vm_exec_main(shark_vm *self, shark_module *module, shark_array *args)
@@ -1759,18 +1846,10 @@ SHARK_API shark_value shark_vm_exec_main(shark_vm *self, shark_module *module, s
     self->error = &error;
     
     shark_function *main = SHARK_AS_FUNCTION(main_value);
-    shark_vm_frame frame;
-    frame.parent = NULL;
-    frame.module = main->owner;
-    frame.function = main;
-    frame.globals = main->owner->names;
-    frame.const_table = main->owner->const_table;
-    frame.base = self->TOS;
-    frame.code = main->code.bytecode;
-
+    
     self->stack[self->TOS++] = SHARK_FROM_PTR(args);
     if (self->TOS == self->stack_size)
         shark_vm_grow_stack(self);
 
-    shark_vm_execute(self, frame);
+    shark_vm_execute(self, NULL, main->owner, main);
 }

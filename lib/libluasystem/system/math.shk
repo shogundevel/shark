@@ -56,4 +56,4 @@ var min = math.min
 var max = math.max
 
 function random(x)
-    return math.random(x) - 1
+    return math::random(x) - 1

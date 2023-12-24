@@ -1,0 +1,85 @@
+###############################################################################
+### Copyright ##################################################################
+## 
+## Copyright 2022 Daniel Alvarez <shogundevel@gmail.com>
+## 
+## Permission is hereby granted, free of charge, to any person
+## obtaining a copy of this software and associated documentation files
+## (the "Software"), to deal in the Software without restriction,
+## including without limitation the rights to use, copy, modify, merge,
+## publish, distribute, sublicense, and/or sell copies of the Software,
+## and to permit persons to whom the Software is furnished to do so,
+## subject to the following conditions:
+## 
+## The above copyright notice and this permission notice shall be
+## included in all copies or substantial portions of the Software.
+## 
+## THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+## EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+## MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+## IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+## CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+## TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+## SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+## 
+################################################################################
+
+import system.string: len, format
+import info
+
+var __SAVE_PATH__ = format("/gsdata/%/save", [info::id])
+
+var FREAD
+var FCREATE
+
+var System
+
+var io
+var open = io.open
+var read = io.read
+var fsize = io.size
+var write = io.write
+var close = io.close
+
+class save_file
+    function init(filename, mode)
+        self.file = open(filename, mode)
+        self.offset = 0
+    
+    function put(value)
+        self.puts(value)
+    
+    function puts(data)
+        write(self.file, self.offset, data, len(data))
+        self.offset += len(data)
+    
+    function printf(data, args)
+        self.puts(format(data, args))
+    
+    function fetch()
+        return self.read(1) or '\0'
+    
+    function read(size)
+        var clip = size
+        var file_size = fsize(self.file)
+        var file_offset = self.offset + size
+        if file_offset >= file_size then
+            clip = clip - (file_offset - file_size)
+        var data = read(self.file, self.offset, clip)
+        self.offset = self.offset + clip
+        return data
+    
+    function at_end()
+        return self.offset >= size(self.file)
+    
+    function close()
+        close(self.file)
+
+function get_save_file(mode)
+    if mode == "r" then
+        if not System::doesFileExist(__SAVE_PATH__) then
+            return null
+        mode = FREAD
+    else
+        mode = FCREATE
+    return new save_file(__SAVE_PATH__, mode)

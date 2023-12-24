@@ -35,22 +35,27 @@ import sharkc.error: compiler_error
 var op_priority = {
     "or": 1,
     "and": 2,
-    "==": 3,
-    "!=": 3,
-    "not": 3,
-    "in": 3,
-    "<": 4,
-    "<=": 4,
-    ">": 4,
-    ">=": 4,
-    "+": 5,
-    "-": 5,
-    "*": 6,
-    "/": 6,
-    "%": 6
+    "&": 3,
+    "|": 3,
+    "^": 3,
+    "<~": 4,
+    "~>": 4,
+    "==": 5,
+    "!=": 5,
+    "not": 5,
+    "in": 5,
+    "<": 6,
+    "<=": 6,
+    ">": 6,
+    ">=": 6,
+    "+": 7,
+    "-": 7,
+    "*": 8,
+    "/": 8,
+    "%": 8
 }
 
-var unary_operators = {"not", "-"}
+var unary_operators = {"not", "-", "~"}
 
 class string_proxy
     function init(data)
@@ -622,6 +627,8 @@ class compiler
             self.backend.false_exp()
         else if self.token.type == "int" then
             self.backend.int_literal(self.next())
+        else if self.token.type == "hex" then
+            self.backend.hex_literal(self.next())
         else if self.token.type == "float" then
             self.backend.float_literal(self.next())
         else if self.token.type == "char" then

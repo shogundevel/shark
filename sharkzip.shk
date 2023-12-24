@@ -25,100 +25,135 @@
 ################################################################################
 
 import system.io: puts, printf, open
-import system.path: join, listdir, mkdir
-import system.util: pop
-import system.string: encode, decode
+import system.path: join, listdir, mkdir, get_tail
+import system.util: pop, extend
+import system.string: encode, decode, concat, bytes
 
-var OBJECT_NULL     = 0
-var OBJECT_DIR      = 1
-var OBJECT_FILE     = 2
+var OBJ_FILE = 67324752
+var OBJ_DIRC = 33639248
+var OBJ_DIRE = 101010256
 
-function read_file(buffer, name, file)
+var OBJ_POLY = 3988292384
+var OBJ_MASK = 4294967295
+
+function crc32(data)
+    var crc = OBJ_MASK
+    for byte in range(data.tell()) do
+        crc = crc ^ data.get(byte)
+        for bit in range(8) do
+            if (crc & 1) != 0 then
+                crc = (crc ~> 1) ^ OBJ_POLY
+            else
+                crc = (crc ~> 1)
+    return (~crc) & OBJ_MASK
+
+function write_file(buffer, name, file)
+    var head_data = new bytes ()
     var name_data = encode(name)
-    buffer.put(name_data.tell())
-    buffer.puts(name_data)
-    while true do
-        var file_data = file.read(255)
-        buffer.put(file_data.tell())
-        buffer.puts(file_data)
-        if file_data.tell() != 255 then
-            break
-    file.close()
+    var file_data = new bytes ()
+    
+    head_data.put_int(OBJ_FILE)
+    head_data.put_short(1)      # min version
+    head_data.put_short(0)      # bit flag
+    head_data.put_short(0)      # compression method
+    head_data.put_short(0)      # time
+    head_data.put_short(0)      # date
+    
+    if file != null then
+        while true do
+            var raw_data = file.read(256)
+            file_data.puts(raw_data)
+            if raw_data.tell() != 256 then
+                break
+    
+    var crc = crc32(file_data)
+    
+    head_data.put_int(crc)                  # crc32
+    head_data.put_int(file_data.tell())     # size
+    head_data.put_int(file_data.tell())     # size
+    head_data.put_short(name_data.tell())   # name_size
+    head_data.put_short(0)                  # dummy
+    head_data.puts(name_data)               # name_data
+    
+    if file != null then
+        file.close()
+    
+    buffer.puts(head_data)
+    buffer.puts(file_data)
+    
+    return [crc, file_data.tell(), name, head_data.tell() + file_data.tell()]
 
-function read_dir(buffer, name, path)
-    var name_data = encode(name)
-    buffer.put(name_data.tell())
-    buffer.puts(name_data)
+function write_dir(buffer, name, path)
+    var child_data = [ write_file(buffer, concat(name, "/"), null) ]
     var dir_data = listdir(path)
     if dir_data == null then
-        printf("can't process file or directory '%'.", [path])
-        buffer.put(OBJECT_NULL)
         return
-    for child_name in dir_data do
-        if child_name == "." or child_name == ".." then
+    for child in dir_data do
+        if child == "." or child == ".." then
             continue
-        var child_path = join(path, child_name)
+        var child_path = join(path, child)
+        var child_name = join(name, child)
         var file = open(child_path, "rb")
         if file == null then
-            buffer.put(OBJECT_DIR)
-            read_dir(buffer, child_name, child_path)
+            extend(child_data, write_dir(buffer, child_name, child_path))
         else
-            buffer.put(OBJECT_FILE)
-            read_file(buffer, child_name, file)
-    buffer.put(OBJECT_NULL)
+            child_data << write_file(buffer, child_name, file)
+    return child_data
 
 function zip(source, target)
     var output = open(target, "wb")
+    
     if output == null then
         printf("can't open output file '%' for writting, operation aborted.", [target])
         return
-    read_dir(output, "root", source)
+    
+    var data = write_dir(output, get_tail(source), source)
+    var offset = 0
+    var head_data = new bytes ()
+    
+    for head in data do
+        var name_data = encode(head[2])
+        head_data.put_int(OBJ_DIRC)
+        head_data.put_short(1)      # version made by
+        head_data.put_short(1)      # min version
+        head_data.put_short(0)      # bit flag
+        head_data.put_short(0)      # compression method
+        head_data.put_short(0)      # time
+        head_data.put_short(0)      # date
+        head_data.put_int(head[0])              # crc32
+        head_data.put_int(head[1])              # size
+        head_data.put_int(head[1])              # size
+        head_data.put_short(name_data.tell())   # name_size
+        head_data.put_short(0)                  # dummy
+        head_data.put_short(0)                  # dummy
+        head_data.put_short(0)                  # disk
+        head_data.put_short(0)                  # file attr
+        head_data.put_int(0)                    # file attr
+        head_data.put_int(offset)               # offset
+        head_data.puts(name_data)               # name_data
+        offset += head[3]
+    
+    var head_size = head_data.tell()
+    
+    head_data.put_int(OBJ_DIRE)
+    head_data.put_short(0)      # disk
+    head_data.put_short(0)      # disk central
+    head_data.put_short(sizeof(data))   # header count
+    head_data.put_short(sizeof(data))   # header count
+    head_data.put_int(head_size)        # header size
+    head_data.put_int(offset)           # header offset
+    head_data.put_short(0)              # dummy
+    
+    output.puts(head_data)
     output.close()
-
-function write_file(input, file, path)
-    while true do
-        var chunk_size = input.fetch()
-        file.puts(input.read(chunk_size))
-        if chunk_size != 255 then
-            break
-    file.close()
-
-function write_dir(input, target)
-    while true do
-        var object_type = input.fetch()
-        if object_type == OBJECT_NULL then
-            return
-        var name_size = input.fetch()
-        var name_data = input.read(name_size)
-        var name = decode(name_data)
-        var path = join(target, name)
-        if object_type == OBJECT_FILE then
-            var file = open(path, "wb")
-            write_file(input, file, path)
-        else if object_type == OBJECT_DIR then
-            mkdir(path)
-            write_dir(input, path)
-        else
-            puts("warning: the input file seems corrupted.\n")
-            return
-
-function unzip(input, target)
-    input.read(5)
-    mkdir(target)
-    write_dir(input, target)
-    input.close()
 
 function main(args)
     if sizeof(args) != 3 then
+        printf("%\n", [crc32(encode("123456789"))])
         puts("usage: zip <source> <target>\n")
-        puts("\tzip/unzip a file or directory using sharkzip algorithm.\n")
-        puts("\tif <source> points to a file, it will be interpreted as a zipped file to be unzipped at <target>.\n")
-        puts("\tif <source> is not a file a directory is assumed, and will be zipped into <target>\n")
+        puts("\tzip a <source> directory to <target> zip archive.\n")
+        puts("\tNOTE: the resulting archive is compatible with any standard zip file program and uses no compression method.\n")
         return
     var source = args[1]
     var target = args[2]
-    var object = open(args[1], "rb")
-    if object != null then
-        unzip(object, target)
-    else
-        zip(source, target)
+    zip(source, target)

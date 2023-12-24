@@ -61,7 +61,7 @@ public class ModuleReader
 	
 	private String fetch_str() throws IOException
 	{
-        byte[] data = new byte[fetch_int()];
+        byte[] data = new byte[fetch_short()];
         source.read(data);
 		return new String(data);
 	}
@@ -87,7 +87,7 @@ public class ModuleReader
 			}
 		}
 		
-		int const_table_size = fetch_int();
+		int const_table_size = fetch_short();
 		module.const_table = new Object[const_table_size];
 		
 		for (int i = 0; i < const_table_size; i++)
@@ -103,7 +103,7 @@ public class ModuleReader
 				value = Double.parseDouble(fetch_str());
 				break;
 			case CONST_CHAR:
-                int size = fetch_int();
+                int size = fetch_short();
                 if (size == 1)
                     value = (char) source.read();
                 else
@@ -149,7 +149,7 @@ public class ModuleReader
 		{
 			int c = source.read();
 			if (c == -1) break;
-			c |= (source.read() << 8) | (source.read() << 16) | (source.read() << 24);
+			c |= source.read() << 8;
 			byte[] c_data = new byte[c];
             source.read(c_data);
             String module_name = new String (c_data);

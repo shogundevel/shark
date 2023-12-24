@@ -49,6 +49,11 @@ var binary_op_table = {
     "<=": nodes::binary_op_le,
     "==": nodes::binary_op_eq,
     "!=": nodes::binary_op_ne,
+    "&": nodes::binary_op_bit_and,
+    "|": nodes::binary_op_bit_or,
+    "^": nodes::binary_op_bit_xor,
+    "<~": nodes::binary_op_bit_shl,
+    "~>": nodes::binary_op_bit_shr,
     "and": nodes::binary_op_and,
     "or": nodes::binary_op_or
 }
@@ -64,6 +69,7 @@ var augmented_op_table = {
 
 var unary_op_table = {
     "not": nodes::unary_op_not,
+    "~": nodes::unary_op_bit_not,
     "-": nodes::unary_op_minus
 }
 

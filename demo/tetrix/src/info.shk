@@ -1,0 +1,4 @@
+
+var id = "tetrix"
+var name = "Tetrix"
+var author = "Shark SDK"
